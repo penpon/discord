@@ -29,6 +29,8 @@ async def on_ready():
 
 @client.event
 async def on_disconnect():
-    print('Bot has been disconnected.')
+    print("Connection lost. Attempting to reconnect...")
+    await client.login(TOKEN)
+    await client.connect()
 
 client.run(TOKEN)
