@@ -4,8 +4,8 @@ import cogs.quiz as quiz
 import cogs.general as general
 import os
 
-TOKEN = os.environ.get("TOKEN_MAN")
-# TOKEN = os.environ.get("TOKEN_NU")
+# TOKEN = os.environ.get("TOKEN_MAN")
+TOKEN = os.environ.get("TOKEN_NU")
 
 intents = discord.Intents.default()
 intents.message_content = True
@@ -30,7 +30,15 @@ async def on_ready():
 @client.event
 async def on_disconnect():
     print("Connection lost. Attempting to reconnect...")
-    await client.login(TOKEN)
-    await client.connect()
+    # await client.close()
+    # await client.login(TOKEN)
+    # await client.connect()
+
+@bot.command()
+async def help(ctx, arg=None):
+    if arg == "ping":
+        await ctx.send("Ping Command:\n  $ping - Checks the bot's latency.")
+    if arg == "quiz":
+        await ctx.send("Quiz Command:\n  The quiz command conducts a quiz.")
 
 client.run(TOKEN)
