@@ -4,8 +4,8 @@ import cogs.quiz as quiz
 import cogs.general as general
 import os
 
-TOKEN = os.environ.get("TOKEN_MAN")
-# TOKEN = os.environ.get("TOKEN_NU")
+# TOKEN = os.environ.get("TOKEN_MAN")
+TOKEN = os.environ.get("TOKEN_NU")
 
 intents = discord.Intents.default()
 intents.message_content = True
