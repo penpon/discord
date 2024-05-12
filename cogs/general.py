@@ -12,6 +12,9 @@ class General(commands.Cog):
 
     @commands.command()
     async def ping(self, ctx):
+        '''
+        Checks the bot's latency.
+        '''
         print("pong!")
         await ctx.send("pong!")
 

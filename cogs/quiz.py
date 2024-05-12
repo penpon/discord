@@ -25,6 +25,9 @@ class Quiz(commands.Cog):
 
     @commands.command()
     async def quiz(self, ctx):
+        '''
+        Starts a quiz
+        '''
         await ctx.send("ポケモンクイズを始めます！")
         random_number = random.randint(1, 721)
         try:
