@@ -2,6 +2,8 @@ import discord
 from discord.ext import commands
 import cogs.read as read
 import cogs.general as general
+import cogs.db as db
+import cogs.recorder as recorder
 import os
 
 # TOKEN = os.environ.get("TOKEN_MAN")
@@ -14,6 +16,7 @@ intents.message_content = True
 
 client = commands.Bot(command_prefix="$", intents=intents)
 
+
 @client.event
 async def on_ready():
     print("-----")
@@ -24,11 +27,16 @@ async def on_ready():
     try:
         await read.setup(client)
         await general.setup(client)
+        await db.setup(client)
+        await recorder.setup(client)
         # プレイ中の状態を設定する
         # await client.change_presence(activity=discord.Game(name="ポケモンクイズ"))
-        await client.change_presence(activity=discord.CustomActivity(name="👾読み上げBot稼働中👾"))
+        await client.change_presence(
+            activity=discord.CustomActivity(name="👾読み上げBot稼働中👾")
+        )
     except discord.errors.ClientException as e:
         print(e)
+
 
 @client.event
 async def on_disconnect():
