@@ -1,6 +1,7 @@
 .DS_Store
 .idea/
-pokemon.csv
-pokemon_jpg/
+*__pycache__
+*.jpg
+*.jpeg
+*.png
 venv/
-cogs/__pycache__/
