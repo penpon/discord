@@ -3,7 +3,6 @@ from discord.ext import commands
 import cogs.read as read
 import cogs.general as general
 import cogs.db as db
-import cogs.recorder as recorder
 import os
 
 # TOKEN = os.environ.get("TOKEN_MAN")
@@ -28,7 +27,6 @@ async def on_ready():
         await read.setup(client)
         await general.setup(client)
         await db.setup(client)
-        await recorder.setup(client)
         # プレイ中の状態を設定する
         # await client.change_presence(activity=discord.Game(name="ポケモンクイズ"))
         await client.change_presence(
