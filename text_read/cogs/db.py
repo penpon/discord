@@ -25,16 +25,25 @@ class DB(commands.Cog):
 
     @commands.Cog.listener()
     async def on_message(self, message):
-        """Discordのメッセージをデータベースに保存"""
+        """Discordのメッセージをデータベースに保存（データをprintする）"""
         if message.author.bot:
             return  # ボットのメッセージは無視
 
-        # データベースにメッセージを保存
+        author = str(message.author)
+        content = message.content
+        timestamp = str(message.created_at)
+
+        # 追加: 保存するデータをprint
+        print(f"保存するデータ: author={author}, content={content}, timestamp={timestamp}")
+
         with sqlite3.connect("messages.db") as conn:
             c = conn.cursor()
             c.execute(
-                "INSERT INTO messages (author, content, timestamp) VALUES (?, ?, ?)",
-                (str(message.author), message.content, str(message.created_at)),
+                """
+                INSERT INTO messages (author, content, timestamp)
+                VALUES (?, ?, ?)
+                """,
+                (author, content, timestamp),
             )
             conn.commit()
 
