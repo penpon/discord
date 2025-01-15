@@ -16,12 +16,7 @@ connections = {}
 @bot.command(name="join", description="ボイスチャンネルに参加し、録音を開始します。")
 async def join(ctx):
     if ctx.author.voice is None:
-        embed = discord.Embed(
-            title="エラー",
-            description="あなたがボイスチャンネルに参加していません。",
-            color=discord.Colour.red(),
-        )
-        await ctx.send(embed=embed)
+        print("エラー: あなたがボイスチャンネルに参加していません。")
         return
     try:
         vc = await ctx.author.voice.channel.connect()
@@ -29,26 +24,15 @@ async def join(ctx):
         # 自動的に録音を開始する
         await start_recording(ctx)
     except:
-        embed = discord.Embed(
-            title="エラー",
-            description="ボイスチャンネルに接続できません。\nボイスチャンネルの権限を確認してください。",
-            color=discord.Colour.red(),
-        )
-        await ctx.send(embed=embed)
+        print("エラー: ボイスチャンネルに接続できません。\nボイスチャンネルの権限を確認してください。")
         return
-    embed = discord.Embed(
-        title="成功", description="ボイスチャンネルに接続し、録音を開始しました。", color=discord.Colour.green()
-    )
-    await ctx.send(embed=embed)
+    print("成功: ボイスチャンネルに接続し、録音を開始しました。")
 
 
 @bot.command(name="leave", description="ボイスチャンネルから切断し、録音を停止します。")
 async def leave(ctx):
     if ctx.guild.voice_client is None:
-        embed = discord.Embed(
-            title="エラー", description="ボイスチャンネルに接続していません。", color=discord.Colour.red()
-        )
-        await ctx.send(embed=embed)
+        print("エラー: ボイスチャンネルに接続していません。")
         return
 
     # 録音を停止
@@ -58,17 +42,14 @@ async def leave(ctx):
         del connections[ctx.guild.id]  # 接続情報を削除
 
     await ctx.guild.voice_client.disconnect()
-    embed = discord.Embed(
-        title="成功", description="ボイスチャンネルから切断し、録音を停止しました。", color=discord.Colour.green()
-    )
-    await ctx.send(embed=embed)
+    print("成功: ボイスチャンネルから切断し、録音を停止しました。")
 
 
 @bot.command(name="record", description="録音を開始します。")
 async def record(ctx):
     voice = ctx.author.voice
     if not voice:
-        await ctx.send("You aren't in a voice channel!")
+        print("You aren't in a voice channel!")
 
     # Connect to the voice channel the author is in.
     vc = await voice.channel.connect()
@@ -76,7 +57,7 @@ async def record(ctx):
     connections.update({ctx.guild.id: vc})
 
     await start_recording(ctx)
-    await ctx.send("Started recording!")
+    print("Started recording!")
 
 
 async def start_recording(ctx):
@@ -107,9 +88,7 @@ async def once_done(sink: discord.sinks, channel: discord.TextChannel, *args):
     await sink.vc.disconnect()  # Disconnect from the voice channel.
 
     # Send a message with the accumulated files.
-    await channel.send(
-        f"Finished recording audio for: {', '.join(recorded_users)}.", files=saved_files
-    )
+    print(f"Finished recording audio for: {', '.join(recorded_users)}.")
 
 
 @bot.command(name="stop_recording", description="録音を停止します。")
@@ -119,10 +98,10 @@ async def stop_recording(ctx):
         # Stop recording, and call the callback (once_done).
         vc.stop_recording()
         del connections[ctx.guild.id]  # Remove the guild from the cache.
-        await ctx.send("Recording stopped!")
+        print("Recording stopped!")
     else:
         # Respond with this if we aren't recording.
-        await ctx.send("I am currently not recording here.")
+        print("I am currently not recording here.")
 
 
 bot.run(TOKEN)
