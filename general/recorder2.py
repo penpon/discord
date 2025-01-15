@@ -82,9 +82,9 @@ async def record(ctx):
 async def start_recording(ctx):
     vc = connections[ctx.guild.id]
 
-    # Start recording using the WaveSink.
+    # Start recording using the MP3Sink.
     vc.start_recording(
-        discord.sinks.WaveSink(),  # The sink type to use.
+        discord.sinks.MP3Sink(),  # The sink type to use.
         once_done,  # What to do once done.
         ctx.channel,  # The channel to send the recording result.
     )
@@ -98,11 +98,11 @@ async def once_done(sink: discord.sinks, channel: discord.TextChannel, *args):
     # Save the audio files to local storage
     saved_files = []
     for user_id, audio in sink.audio_data.items():
-        file_path = f"/Users/nana/workspace/discord/general/{user_id}.wav"
+        file_path = f"/Users/nana/workspace/discord/general/{user_id}.mp3"
         os.makedirs(os.path.dirname(file_path), exist_ok=True)
         with open(file_path, "wb") as f:
             f.write(audio.file.read())
-        saved_files.append(discord.File(file_path, filename=f"{user_id}.wav"))
+        saved_files.append(discord.File(file_path, filename=f"{user_id}.mp3"))
 
     await sink.vc.disconnect()  # Disconnect from the voice channel.
 
