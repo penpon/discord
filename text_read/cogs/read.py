@@ -77,6 +77,17 @@ class TTSandDB(commands.Cog):
         ):
             return
 
+        # ボットが現在接続しているボイスチャンネルを取得
+        voice_client = message.guild.voice_client
+        if not voice_client or not voice_client.channel:
+            print("Bot is not connected to a voice channel. Skipping TTS.")
+            return
+
+        # メッセージが送信されたテキストチャンネルとボットのボイスチャンネルの一致を確認
+        if message.channel != voice_client.channel:
+            print("Message is not from the bot's voice channel. Ignoring message.")
+            return
+
         # ボイスチャンネルが未接続の場合はスキップ
         if not self.voice_channel or not message.guild.voice_client:
             print("Bot is not connected to a voice channel. Skipping TTS.")
