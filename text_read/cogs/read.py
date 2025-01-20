@@ -5,14 +5,32 @@ import re
 import io
 from asyncio import Queue
 import asyncio
+import sqlite3
 
 
-class TTS(commands.Cog):
+class TTSandDB(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self.voice_channel = None
         self.audio_queue = Queue()
         self.check_voice_channel.start()
+        self.db_init()
+
+    def db_init(self):
+        """データベースを初期化"""
+        with sqlite3.connect("messages.db") as conn:
+            c = conn.cursor()
+            c.execute(
+                """
+                CREATE TABLE IF NOT EXISTS messages (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    author TEXT,
+                    content TEXT,
+                    timestamp TEXT
+                )
+                """
+            )
+        conn.commit()
 
     @commands.command(name="join")
     async def join(self, ctx):
@@ -66,6 +84,22 @@ class TTS(commands.Cog):
 
         if self.voice_channel and message.guild.voice_client:
             try:
+                author = str(message.author)
+                content = message.content
+                timestamp = str(message.created_at)
+                print(
+                    f"保存するデータ: author={author}, content={content}, timestamp={timestamp}"
+                )
+                with sqlite3.connect("messages.db") as conn:
+                    c = conn.cursor()
+                    c.execute(
+                        """
+                        INSERT INTO messages (author, content, timestamp)
+                        VALUES (?, ?, ?)
+                        """,
+                        (author, content, timestamp),
+                    )
+                    conn.commit()
                 tts = gTTS(text=message.content[:200], lang="ja")
                 audio_data = io.BytesIO()
                 tts.write_to_fp(audio_data)
@@ -129,4 +163,4 @@ class TTS(commands.Cog):
 
 # CogsにBotを登録
 async def setup(bot):
-    await bot.add_cog(TTS(bot))
+    await bot.add_cog(TTSandDB(bot))
