@@ -30,7 +30,7 @@ class TTSandDB(commands.Cog):
                 )
                 """
             )
-        conn.commit()
+            conn.commit()
 
     @commands.command(name="join")
     async def join(self, ctx):
@@ -44,19 +44,12 @@ class TTSandDB(commands.Cog):
         """ボイスチャンネルから切断します"""
         if ctx.voice_client:
             try:
-                if ctx.voice_client.is_playing():
-                    ctx.voice_client.stop()
-
+                # 音声再生を停止し、キューをクリア
+                ctx.voice_client.stop()
                 while not self.audio_queue.empty():
                     await self.audio_queue.get()
-
+                # ボイスクライアントの切断
                 await ctx.voice_client.disconnect()
-
-                if ctx.voice_client:
-                    try:
-                        ctx.voice_client.cleanup()
-                    except Exception as e:
-                        print(f"Error during cleanup: {e}")
             except Exception as e:
                 print(f"Error during disconnect: {e}")
             finally:
@@ -67,7 +60,6 @@ class TTSandDB(commands.Cog):
         if message.author == self.bot.user:
             return
 
-        # "$"から始まるメッセージを無視
         if message.content.startswith("$"):
             print(f"Ignoring message starting with $: {message.content}")
             return
@@ -77,50 +69,43 @@ class TTSandDB(commands.Cog):
         ):
             return
 
-        # ボットが現在接続しているボイスチャンネルを取得
-        voice_client = message.guild.voice_client
-        if not voice_client or not voice_client.channel:
-            print("Bot is not connected to a voice channel. Skipping TTS.")
-            return
+        author = str(message.author)
+        content = message.content
+        timestamp = str(message.created_at)
+        print(
+            f"保存するデータ: author={author}, content={content}, channel={message.channel}, timestamp={timestamp}"
+        )
+        with sqlite3.connect("messages.db") as conn:
+            c = conn.cursor()
+            c.execute(
+                """
+                INSERT INTO messages (author, content, timestamp)
+                VALUES (?, ?, ?)
+                """,
+                (author, content, timestamp),
+            )
+            conn.commit()
 
-        # メッセージが送信されたテキストチャンネルとボットのボイスチャンネルの一致を確認
-        if message.channel != voice_client.channel:
-            print("Message is not from the bot's voice channel. Ignoring message.")
-            return
-
-        # ボイスチャンネルが未接続の場合はスキップ
         if not self.voice_channel or not message.guild.voice_client:
             print("Bot is not connected to a voice channel. Skipping TTS.")
             return
 
-        if self.voice_channel and message.guild.voice_client:
-            try:
-                author = str(message.author)
-                content = message.content
-                timestamp = str(message.created_at)
-                print(
-                    f"保存するデータ: author={author}, content={content}, timestamp={timestamp}"
-                )
-                with sqlite3.connect("messages.db") as conn:
-                    c = conn.cursor()
-                    c.execute(
-                        """
-                        INSERT INTO messages (author, content, timestamp)
-                        VALUES (?, ?, ?)
-                        """,
-                        (author, content, timestamp),
-                    )
-                    conn.commit()
-                tts = gTTS(text=message.content[:200], lang="ja")
-                audio_data = io.BytesIO()
-                tts.write_to_fp(audio_data)
-                audio_data.seek(0)
-                await self.audio_queue.put(audio_data)
+        voice_client = message.guild.voice_client
+        if message.channel != voice_client.channel:
+            print("Message is not from the bot's voice channel. Ignoring message.")
+            return
 
-                if not message.guild.voice_client.is_playing():
-                    await self.play_audio(message.guild.voice_client)
-            except Exception as e:
-                print(f"Error in TTS: {e}")
+        try:
+            tts = gTTS(text=message.content, lang="ja")
+            audio_data = io.BytesIO()
+            tts.write_to_fp(audio_data)
+            audio_data.seek(0)
+            await self.audio_queue.put(audio_data)
+
+            if not message.guild.voice_client.is_playing():
+                await self.play_audio(message.guild.voice_client)
+        except Exception as e:
+            print(f"Error in TTS: {e}")
 
     async def play_audio(self, voice_client):
         if not voice_client or not voice_client.is_connected():
@@ -146,7 +131,6 @@ class TTSandDB(commands.Cog):
                 break
 
     def _queue_next(self):
-        """次の音声を再生"""
         if self.voice_channel and self.voice_channel.guild.voice_client:
             if not self.audio_queue.empty():
                 self.bot.loop.create_task(
@@ -164,14 +148,17 @@ class TTSandDB(commands.Cog):
             if voice_client and len(self.voice_channel.members) == 1:
                 try:
                     await voice_client.disconnect()
+                    print("Successfully disconnected from the voice channel.")
+
                     if voice_client:
                         voice_client.cleanup()
+                        print("Voice client cleanup completed.")
+
                 except Exception as e:
                     print(f"Error during auto-disconnect cleanup: {e}")
                 finally:
                     self.voice_channel = None
 
 
-# CogsにBotを登録
 async def setup(bot):
     await bot.add_cog(TTSandDB(bot))
