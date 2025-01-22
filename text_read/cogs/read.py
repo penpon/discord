@@ -64,6 +64,7 @@ class TTSandDB(commands.Cog):
             print(f"Ignoring message starting with $: {message.content}")
             return
 
+        # 数字のみの長文やURLをスキップする
         if re.search(r"\b\d{5,}\b", message.content) or re.search(
             r"\bhttps?://\S+", message.content
         ):
@@ -107,6 +108,46 @@ class TTSandDB(commands.Cog):
         except Exception as e:
             print(f"Error in TTS: {e}")
 
+    @commands.Cog.listener()
+    async def on_voice_state_update(self, member, before, after):
+        """ユーザがボイスチャンネルに入室/退出したときに名前を読み上げる"""
+        if member.bot:
+            return  # Botは無視
+
+        # 「botがいるボイスチャンネル」にユーザが入室した
+        if after.channel == self.voice_channel and before.channel != after.channel:
+            voice_client = member.guild.voice_client
+            if voice_client and voice_client.is_connected():
+                try:
+                    tts = gTTS(text=f"{member.display_name}さんが入室しました", lang="ja")
+                    audio_data = io.BytesIO()
+                    tts.write_to_fp(audio_data)
+                    audio_data.seek(0)
+                    await self.audio_queue.put(audio_data)
+
+                    if not voice_client.is_playing():
+                        await self.play_audio(voice_client)
+                except Exception as e:
+                    print(f"Error in TTS for voice join: {e}")
+
+        # 「botがいるボイスチャンネル」からユーザが退出した
+        elif (
+            before.channel == self.voice_channel and after.channel != self.voice_channel
+        ):
+            voice_client = member.guild.voice_client
+            if voice_client and voice_client.is_connected():
+                try:
+                    tts = gTTS(text=f"{member.display_name}さんが退出しました", lang="ja")
+                    audio_data = io.BytesIO()
+                    tts.write_to_fp(audio_data)
+                    audio_data.seek(0)
+                    await self.audio_queue.put(audio_data)
+
+                    if not voice_client.is_playing():
+                        await self.play_audio(voice_client)
+                except Exception as e:
+                    print(f"Error in TTS for voice leave: {e}")
+
     async def play_audio(self, voice_client):
         if not voice_client or not voice_client.is_connected():
             print("Error during audio playback: Not connected to voice.")
@@ -145,6 +186,7 @@ class TTSandDB(commands.Cog):
     async def check_voice_channel(self):
         if self.voice_channel:
             voice_client = self.voice_channel.guild.voice_client
+            # ボイスチャンネル内がBot1人(=メンバー数1)の場合は自動で抜ける
             if voice_client and len(self.voice_channel.members) == 1:
                 try:
                     await voice_client.disconnect()
