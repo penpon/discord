@@ -12,6 +12,7 @@ class TTSandDB(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self.voice_channel = None
+        # audio_queue には (audio_data, speed) のタプルを入れる
         self.audio_queue = Queue()
         self.check_voice_channel.start()
         self.db_init()
@@ -87,11 +88,13 @@ class TTSandDB(commands.Cog):
             )
             conn.commit()
 
+        # Botがボイスチャンネルにいない場合はスキップ
         if not self.voice_channel or not message.guild.voice_client:
             print("Bot is not connected to a voice channel. Skipping TTS.")
             return
 
         voice_client = message.guild.voice_client
+        # メッセージがBotのいるチャンネルじゃなければスキップ
         if message.channel != voice_client.channel:
             print("Message is not from the bot's voice channel. Ignoring message.")
             return
@@ -101,7 +104,8 @@ class TTSandDB(commands.Cog):
             audio_data = io.BytesIO()
             tts.write_to_fp(audio_data)
             audio_data.seek(0)
-            await self.audio_queue.put(audio_data)
+            # メッセージ読み上げなので speed=1.0 (等倍)
+            await self.audio_queue.put((audio_data, 1.0))
 
             if not message.guild.voice_client.is_playing():
                 await self.play_audio(message.guild.voice_client)
@@ -114,39 +118,85 @@ class TTSandDB(commands.Cog):
         if member.bot:
             return  # Botは無視
 
-        # 「botがいるボイスチャンネル」にユーザが入室した
-        if after.channel == self.voice_channel and before.channel != after.channel:
-            voice_client = member.guild.voice_client
+        # Botが現在接続しているチャンネル（self.voice_channel）を取得
+        bot_channel = self.voice_channel
+        voice_client = bot_channel.guild.voice_client if bot_channel else None
+
+        # --- 「botがいるボイスチャンネル」にユーザが入室した(入室時だけ2倍速) ---
+        if after.channel == bot_channel and before.channel != after.channel:
             if voice_client and voice_client.is_connected():
                 try:
-                    tts = gTTS(text=f"{member.display_name}さんが入室しました", lang="ja")
+                    # 入室時は速度を2倍
+                    tts_text = f"{member.display_name}さんが入室しました"
+                    tts = gTTS(text=tts_text, lang="ja")
                     audio_data = io.BytesIO()
                     tts.write_to_fp(audio_data)
                     audio_data.seek(0)
-                    await self.audio_queue.put(audio_data)
+                    await self.audio_queue.put((audio_data, 1.5))  # ★2倍速
 
                     if not voice_client.is_playing():
                         await self.play_audio(voice_client)
                 except Exception as e:
                     print(f"Error in TTS for voice join: {e}")
 
-        # 「botがいるボイスチャンネル」からユーザが退出した
-        elif (
-            before.channel == self.voice_channel and after.channel != self.voice_channel
-        ):
-            voice_client = member.guild.voice_client
+        # 「botがいるボイスチャンネル」からユーザが退出した(退出は等倍)
+        elif before.channel == bot_channel and after.channel != bot_channel:
             if voice_client and voice_client.is_connected():
                 try:
-                    tts = gTTS(text=f"{member.display_name}さんが退出しました", lang="ja")
+                    # 退出時は通常速度
+                    tts_text = f"{member.display_name}さんが退出しました"
+                    tts = gTTS(text=tts_text, lang="ja")
                     audio_data = io.BytesIO()
                     tts.write_to_fp(audio_data)
                     audio_data.seek(0)
-                    await self.audio_queue.put(audio_data)
+                    await self.audio_queue.put((audio_data, 1.5))
 
                     if not voice_client.is_playing():
                         await self.play_audio(voice_client)
                 except Exception as e:
                     print(f"Error in TTS for voice leave: {e}")
+
+        # --- Botがいない他の部屋に入室した(入室は2倍速) ---
+        elif (
+            after.channel
+            and after.channel != bot_channel
+            and before.channel != after.channel
+        ):
+            if voice_client and voice_client.is_connected():
+                try:
+                    tts_text = f"{after.channel.name} に、{member.display_name}さんが入室しました"
+                    tts = gTTS(text=tts_text, lang="ja")
+                    audio_data = io.BytesIO()
+                    tts.write_to_fp(audio_data)
+                    audio_data.seek(0)
+                    await self.audio_queue.put((audio_data, 1.5))  # ★2倍速
+
+                    if not voice_client.is_playing():
+                        await self.play_audio(voice_client)
+                except Exception as e:
+                    print(f"Error in TTS for voice join in another channel: {e}")
+
+        # --- Botがいない他の部屋から退出した(退出は等倍) ---
+        elif (
+            before.channel
+            and before.channel != bot_channel
+            and after.channel != before.channel
+        ):
+            if voice_client and voice_client.is_connected():
+                try:
+                    tts_text = (
+                        f"{before.channel.name} から、{member.display_name}さんが退出しました"
+                    )
+                    tts = gTTS(text=tts_text, lang="ja")
+                    audio_data = io.BytesIO()
+                    tts.write_to_fp(audio_data)
+                    audio_data.seek(0)
+                    await self.audio_queue.put((audio_data, 1.5))
+
+                    if not voice_client.is_playing():
+                        await self.play_audio(voice_client)
+                except Exception as e:
+                    print(f"Error in TTS for voice leave in another channel: {e}")
 
     async def play_audio(self, voice_client):
         if not voice_client or not voice_client.is_connected():
@@ -158,11 +208,15 @@ class TTSandDB(commands.Cog):
                 await asyncio.sleep(1)
                 continue
 
-            audio_data = await self.audio_queue.get()
+            # キューから (audio_data, speed) を取り出す
+            audio_data, speed = await self.audio_queue.get()
             try:
-                print("Playing audio...")
+                print(f"Playing audio... speed={speed}")
+                # 再生速度を調整: -af atempo={speed}
                 voice_client.play(
-                    FFmpegPCMAudio(audio_data, pipe=True),
+                    FFmpegPCMAudio(
+                        audio_data, pipe=True, options=f"-af atempo={speed}"
+                    ),
                     after=lambda e: self.bot.loop.call_soon_threadsafe(
                         self._queue_next
                     ),
