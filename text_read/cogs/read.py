@@ -132,7 +132,7 @@ class TTSandDB(commands.Cog):
                     audio_data = io.BytesIO()
                     tts.write_to_fp(audio_data)
                     audio_data.seek(0)
-                    await self.audio_queue.put((audio_data, 1.5))  # ★2倍速
+                    await self.audio_queue.put((audio_data, 1.2))  # ★2倍速
 
                     if not voice_client.is_playing():
                         await self.play_audio(voice_client)
@@ -149,7 +149,7 @@ class TTSandDB(commands.Cog):
                     audio_data = io.BytesIO()
                     tts.write_to_fp(audio_data)
                     audio_data.seek(0)
-                    await self.audio_queue.put((audio_data, 1.5))
+                    await self.audio_queue.put((audio_data, 1.2))
 
                     if not voice_client.is_playing():
                         await self.play_audio(voice_client)
@@ -169,7 +169,7 @@ class TTSandDB(commands.Cog):
                     audio_data = io.BytesIO()
                     tts.write_to_fp(audio_data)
                     audio_data.seek(0)
-                    await self.audio_queue.put((audio_data, 1.5))  # ★2倍速
+                    await self.audio_queue.put((audio_data, 1.2))  # ★2倍速
 
                     if not voice_client.is_playing():
                         await self.play_audio(voice_client)
@@ -191,7 +191,7 @@ class TTSandDB(commands.Cog):
                     audio_data = io.BytesIO()
                     tts.write_to_fp(audio_data)
                     audio_data.seek(0)
-                    await self.audio_queue.put((audio_data, 1.5))
+                    await self.audio_queue.put((audio_data, 1.2))
 
                     if not voice_client.is_playing():
                         await self.play_audio(voice_client)
