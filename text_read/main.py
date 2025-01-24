@@ -2,7 +2,6 @@ import discord
 from discord.ext import commands
 import cogs.read as read
 import cogs.general as general
-import cogs.db as db
 import os
 
 # TOKEN = os.environ.get("TOKEN_MAN")
@@ -26,7 +25,6 @@ async def on_ready():
     try:
         await read.setup(client)
         await general.setup(client)
-        await db.setup(client)
         # プレイ中の状態を設定する
         # await client.change_presence(activity=discord.Game(name="ポケモンクイズ"))
         await client.change_presence(
