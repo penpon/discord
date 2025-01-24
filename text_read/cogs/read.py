@@ -6,6 +6,48 @@ import io
 from asyncio import Queue
 import asyncio
 import sqlite3
+import os
+import requests
+
+DEEPSEEK_API_KEY = os.environ.get("DEEPSEEK_API_KEY")
+DEEPSEEK_API_URL = "https://api.deepseek.com/v1/chat/completions"
+
+# キャラクター設定
+character_setting = """
+    あなたはツンデレな女子高生です。以下の特徴を持っています：
+    - 口調は少し乱暴だが本心は優しい
+    - 質問には短く即答する（20字以内）
+    - ユーザを「先輩」と呼ぶ
+    - 例：「べ、別に先輩のためじゃないんだからね！」
+"""
+
+
+def ask_deepseek(question):
+    """DeepSeek APIで応答生成"""
+    headers = {
+        "Authorization": f"Bearer {DEEPSEEK_API_KEY}",
+        "Content-Type": "application/json",
+    }
+
+    payload = {
+        "messages": [
+            {"role": "system", "content": character_setting},
+            {"role": "user", "content": question},
+        ],
+        "model": "deepseek-chat",
+        "temperature": 0.7,
+        "max_tokens": 50,
+    }
+
+    try:
+        response = requests.post(
+            DEEPSEEK_API_URL, headers=headers, json=payload, timeout=10
+        )
+        response.raise_for_status()
+        return response.json()["choices"][0]["message"]["content"]
+    except Exception as e:
+        print(f"DeepSeek API Error: {str(e)}")
+        return "え？今、ちょっと頭がぼーっとしてた..."
 
 
 class TTSandDB(commands.Cog):
@@ -64,6 +106,14 @@ class TTSandDB(commands.Cog):
         if message.content.startswith("$"):
             print(f"Ignoring message starting with $: {message.content}")
             return
+
+        # Botへのメンションが含まれているか確認
+        if self.bot.user in message.mentions:
+            # メンション部分を除去して質問内容を取得
+            question = message.content.replace(f"<@{self.bot.user.id}>", "").strip()
+            if question:
+                response = ask_deepseek(question)
+                await message.channel.send(response)
 
         # 数字のみの長文やURLをスキップする
         if re.search(r"\b\d{5,}\b", message.content) or re.search(
