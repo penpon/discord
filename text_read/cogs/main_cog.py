@@ -33,8 +33,8 @@ class TTSandDB(commands.Cog):
 
     @commands.Cog.listener()
     async def on_message(self, message):
-        if message.author == self.bot.user:
-            return
+        # if message.author == self.bot.user:
+        #     return
 
         print(
             f"[MESSAGE] 新しいメッセージを受信: {message.author.name} - {message.content[:20]}..."
@@ -49,7 +49,7 @@ class TTSandDB(commands.Cog):
             print(f"[MENTION] メンションを検出: {message.content[:50]}...")
             question = message.content.replace(f"<@{self.bot.user.id}>", "").strip()
             if question:
-                await message.channel.send("考え中...ちょっと待ってね！")
+                # await message.channel.send("考え中...ちょっと待ってね！")
                 response = ask_deepseek(question)
                 await message.channel.send(response)
 
