@@ -1,4 +1,5 @@
 # main_cog.py
+
 from discord.ext import commands
 from discord import VoiceClient
 from cogs.config import URL_PATTERN, LONG_NUMBER_PATTERN
@@ -36,9 +37,7 @@ class TTSandDB(commands.Cog):
         # if message.author == self.bot.user:
         #     return
 
-        print(
-            f"[MESSAGE] 新しいメッセージを受信: {message.author.name} - {message.content[:20]}..."
-        )
+        print(f"[MESSAGE] 新しいメッセージを受信: {message.author.name} - {message.content}...")
 
         if message.content.startswith("$"):
             print(f"[MESSAGE] コマンドメッセージをスキップ: {message.content}")
@@ -49,7 +48,6 @@ class TTSandDB(commands.Cog):
             print(f"[MENTION] メンションを検出: {message.content[:50]}...")
             question = message.content.replace(f"<@{self.bot.user.id}>", "").strip()
             if question:
-                # await message.channel.send("考え中...ちょっと待ってね！")
                 response = ask_deepseek(question)
                 await message.channel.send(response)
 
@@ -86,15 +84,23 @@ class TTSandDB(commands.Cog):
             if self.voice.voice_channel
             else None
         )
+        # botがどこにも参加していない場合は通知しない
         if not voice_client:
             return
 
-        # 入退室通知処理
+        # 入退室通知文言を生成する関数
         def generate_notification_text():
             if after.channel == self.voice.voice_channel:
                 return f"{member.display_name}さんが入室しました", 1.2
             elif before.channel == self.voice.voice_channel:
-                return f"{member.display_name}さんが退出しました", 1.0
+                return f"{member.display_name}さんが退出しました", 1.2
+            if after.channel is not None:
+                return f"{after.channel.name}部屋に{member.display_name}さんが入室しました", 1.2
+            if before.channel is not None:
+                return (
+                    f"{before.channel.name}部屋から{member.display_name}さんが退出しました",
+                    1.2,
+                )
             return None, None
 
         text, speed = generate_notification_text()

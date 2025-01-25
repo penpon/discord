@@ -14,7 +14,7 @@ class VoiceCommands:
     async def check_voice_channel(self):
         """ボイスチャンネルの自動退出チェック"""
         if self.voice_channel:
-            print("[VOICE] 自動退出チェックを実行中...")
+            # print("[VOICE] 自動退出チェックを実行中...")
             voice_client = self.voice_channel.guild.voice_client
             if voice_client and len(self.voice_channel.members) == 1:
                 print("[VOICE] 最後のメンバーになったため退出します")
