@@ -79,36 +79,47 @@ class TTSandDB(commands.Cog):
         print(
             f"[VOICE STATE] ボイス状態の変更を検出: {member.name} ({before.channel} -> {after.channel})"
         )
+
+        # チャンネルが変わっていない(ミュート/ミュート解除など)ときは何もしない
+        if before.channel == after.channel:
+            return
+
         voice_client = (
             self.voice.voice_channel.guild.voice_client
             if self.voice.voice_channel
             else None
         )
-        # botがどこにも参加していない場合は通知しない
         if not voice_client:
             return
 
-        # 入退室通知文言を生成する関数
-        def generate_notification_text():
-            if after.channel == self.voice.voice_channel:
-                return f"{member.display_name}さんが入室しました", 1.2
-            elif before.channel == self.voice.voice_channel:
-                return f"{member.display_name}さんが退出しました", 1.2
+        # botのいるチャンネルにユーザが入ってきた
+        if after.channel == self.voice.voice_channel:
+            text, speed = f"{member.display_name}さんが入室しました", 1.2
+
+        # botのいるチャンネルからユーザが抜けた
+        elif (
+            before.channel == self.voice.voice_channel
+            and after.channel != self.voice.voice_channel
+        ):
+            text, speed = f"{member.display_name}さんが退出しました", 1.2
+
+        else:
+            # チャンネル移動(別のVCに入室)
             if after.channel is not None:
-                return f"{after.channel.name}に{member.display_name}さんが入室しました", 1.2
-            if before.channel is not None:
-                return (
+                text, speed = (
+                    f"{after.channel.name}に{member.display_name}さんが入室しました",
+                    1.2,
+                )
+            else:
+                text, speed = (
                     f"{before.channel.name}から{member.display_name}さんが退出しました",
                     1.2,
                 )
-            return None, None
 
-        text, speed = generate_notification_text()
-        if text:
-            print(f"[VOICE NOTICE] 通知メッセージを生成: {text}")
-            await self.tts.generate_tts(text, speed)
-            if not voice_client.is_playing():
-                await self.tts.play_audio(voice_client)
+        print(f"[VOICE NOTICE] 通知メッセージを生成: {text}")
+        await self.tts.generate_tts(text, speed)
+        if not voice_client.is_playing():
+            await self.tts.play_audio(voice_client)
 
 
 async def setup(bot):
