@@ -95,10 +95,10 @@ class TTSandDB(commands.Cog):
             elif before.channel == self.voice.voice_channel:
                 return f"{member.display_name}さんが退出しました", 1.2
             if after.channel is not None:
-                return f"{after.channel.name}部屋に{member.display_name}さんが入室しました", 1.2
+                return f"{after.channel.name}に{member.display_name}さんが入室しました", 1.2
             if before.channel is not None:
                 return (
-                    f"{before.channel.name}部屋から{member.display_name}さんが退出しました",
+                    f"{before.channel.name}から{member.display_name}さんが退出しました",
                     1.2,
                 )
             return None, None
