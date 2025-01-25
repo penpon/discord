@@ -1,6 +1,6 @@
 import discord
 from discord.ext import commands
-import cogs.cogs_main as cogs_main
+import cogs.main_cog as main_cog
 import cogs.general as general
 import os
 
@@ -23,7 +23,7 @@ async def on_ready():
     print(discord.__version__)
     print("-----")
     try:
-        await cogs_main.setup(client)
+        await main_cog.setup(client)
         await general.setup(client)
         # プレイ中の状態を設定する
         # await client.change_presence(activity=discord.Game(name="ポケモンクイズ"))
