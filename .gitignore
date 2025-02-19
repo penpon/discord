@@ -6,5 +6,4 @@
 *.png
 venv/
 *.db
-*.mp3
 *.mp4
