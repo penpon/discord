@@ -1,7 +1,7 @@
 # main_cog.py
-
 from discord.ext import commands
-from discord import VoiceClient
+from discord import VoiceClient, FFmpegPCMAudio
+import os
 from cogs.config import URL_PATTERN, LONG_NUMBER_PATTERN
 from cogs.database import db_init, save_message
 from cogs.deepseek import ask_deepseek
@@ -32,12 +32,48 @@ class TTSandDB(commands.Cog):
         await self.voice.leave(ctx)
         self.tts.clear_queue()
 
+    @commands.command(name="play")
+    async def play(self, ctx, command_name: str):
+        """指定されたコマンドに対応する音声ファイルを再生するコマンド"""
+        # 許可されたコマンドとファイルのマッピング
+        ALLOWED_FILES = {"とにかくやれ": "とにかくやれ.mp3"}
+
+        # ユーザーがボイスチャンネルに参加しているか確認
+        if not ctx.author.voice:
+            await ctx.send("ボイスチャンネルに参加してください。")
+            return
+
+        # ボイスチャンネルに参加（未接続の場合）
+        if not ctx.voice_client:
+            await self.join(ctx)
+
+        voice_client = ctx.voice_client
+
+        # コマンドに対応するファイル名を取得
+        filename = ALLOWED_FILES.get(command_name)
+        if not filename:
+            # await ctx.send(f"コマンド '{command_name}' に対応する音声ファイルが見つかりません。")
+            return
+
+        # 音声ファイルのパス（カレントディレクトリからの相対パス）
+        audio_path = os.path.join("sounds", filename)
+
+        # ファイルの存在確認
+        if not os.path.exists(audio_path):
+            # await ctx.send(f"ファイル {filename} が見つかりません。")
+            return
+
+        # 音声ファイルを再生
+        audio_source = FFmpegPCMAudio(audio_path)
+        voice_client.play(audio_source)
+        # await ctx.send(f"{filename} を再生中...")
+
     @commands.Cog.listener()
     async def on_message(self, message):
+        print(f"[MESSAGE] 新しいメッセージを受信: {message.author.name} - {message.content}...")
         # if message.author == self.bot.user:
         #     return
 
-        print(f"[MESSAGE] 新しいメッセージを受信: {message.author.name} - {message.content}...")
 
         if message.content.startswith("$"):
             print(f"[MESSAGE] コマンドメッセージをスキップ: {message.content}")
@@ -80,7 +116,6 @@ class TTSandDB(commands.Cog):
             f"[VOICE STATE] ボイス状態の変更を検出: {member.name} ({before.channel} -> {after.channel})"
         )
 
-        # チャンネルが変わっていない(ミュート/ミュート解除など)ときは何もしない
         if before.channel == after.channel:
             return
 
@@ -92,19 +127,14 @@ class TTSandDB(commands.Cog):
         if not voice_client:
             return
 
-        # botのいるチャンネルにユーザが入ってきた
         if after.channel == self.voice.voice_channel:
             text, speed = f"{member.display_name}さんが入室しました", 1.2
-
-        # botのいるチャンネルからユーザが抜けた
         elif (
             before.channel == self.voice.voice_channel
             and after.channel != self.voice.voice_channel
         ):
             text, speed = f"{member.display_name}さんが退出しました", 1.2
-
         else:
-            # チャンネル移動(別のVCに入室)
             if after.channel is not None:
                 text, speed = (
                     f"{after.channel.name}に{member.display_name}さんが入室しました",
