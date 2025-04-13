@@ -6,6 +6,7 @@ from cogs.config import URL_PATTERN, LONG_NUMBER_PATTERN
 from cogs.database import db_init, save_message
 from cogs.deepseek import ask_deepseek
 from cogs.tts_handler import TTSHandler
+from cogs.elevenlabs_tts import ElevenLabsTTS
 from cogs.voice_commands import VoiceCommands
 import asyncio
 
@@ -15,7 +16,9 @@ class TTSandDB(commands.Cog):
         print("[MAIN] Cogの初期化を開始します")
         self.bot = bot
         self.tts = TTSHandler()
+        self.elevenlabs_tts = ElevenLabsTTS()
         self.voice = VoiceCommands(bot)
+        self.special_user_id = "514786727634927647"  # 特別なユーザーID
         db_init()
         print("[MAIN] Cogの初期化が完了しました")
 
@@ -31,6 +34,7 @@ class TTSandDB(commands.Cog):
         print(f"[COMMAND] leaveコマンドが実行されました: {ctx.author.name}")
         await self.voice.leave(ctx)
         self.tts.clear_queue()
+        self.elevenlabs_tts.clear_queue()
 
     @commands.command(name="play")
     async def play(self, ctx, command_name: str):
@@ -103,9 +107,17 @@ class TTSandDB(commands.Cog):
             voice_client = message.guild.voice_client
             if message.channel == voice_client.channel:
                 print("[TTS] ボイスチャット用メッセージを処理します")
-                await self.tts.generate_tts(message.content)
-                if not voice_client.is_playing():
-                    await self.tts.play_audio(voice_client)
+                # 特定のユーザーIDの場合はElevenLabsを使用
+                if str(message.author.id) == self.special_user_id:
+                    print(f"[SPECIAL USER] 特別なユーザー {message.author.name} のメッセージを処理します")
+                    await self.elevenlabs_tts.generate_tts(message.content)
+                    if not voice_client.is_playing():
+                        await self.elevenlabs_tts.play_audio(voice_client)
+                else:
+                    # 通常のユーザーは従来のTTSを使用
+                    await self.tts.generate_tts(message.content)
+                    if not voice_client.is_playing():
+                        await self.tts.play_audio(voice_client)
 
     @commands.Cog.listener()
     async def on_voice_state_update(self, member, before, after):
