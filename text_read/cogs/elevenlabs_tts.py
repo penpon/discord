@@ -32,11 +32,13 @@ class ElevenLabsTTS:
         )
         os.makedirs(self.output_dir, exist_ok=True)
 
-    async def generate_tts(self, text: str):
+    async def generate_tts(self, text: str, voice_id=None):
         """ElevenLabs APIを使用してTTS音声を生成"""
-        print(f"[ELEVENLABS] 音声生成を開始: {text[:20]}...")
+        # パラメータが指定されていない場合はデフォルトのボイスIDを使用
+        current_voice_id = voice_id if voice_id else self.voice_id
+        print(f"[ELEVENLABS] 音声生成を開始: {text[:20]}... (Voice ID: {current_voice_id})")
 
-        if not self.api_key or not self.voice_id:
+        if not self.api_key or not current_voice_id:
             print("[ELEVENLABS ERROR] APIキーまたはボイスIDが設定されていません")
             return
 
@@ -61,7 +63,7 @@ class ElevenLabsTTS:
 
             # APIにリクエストを送信
             response = requests.post(
-                f"{self.URL}/{self.voice_id}", json=data, headers=headers
+                f"{self.URL}/{current_voice_id}", json=data, headers=headers
             )
 
             if response.status_code != 200:

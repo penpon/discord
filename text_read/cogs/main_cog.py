@@ -19,6 +19,20 @@ class TTSandDB(commands.Cog):
         self.elevenlabs_tts = ElevenLabsTTS()
         self.voice = VoiceCommands(bot)
         self.special_user_id = "514786727634927647"  # 特別なユーザーID
+        # 環境変数のデバッグ出力
+        print(
+            f"[VOICE_ID DEBUG] ELEVENLABS_VOICE_ID_milk: {os.environ.get('ELEVENLABS_VOICE_ID_milk')}"
+        )
+        print(
+            f"[VOICE_ID DEBUG] ELEVENLABS_VOICE_ID_hayane: {os.environ.get('ELEVENLABS_VOICE_ID_hayane')}"
+        )
+
+        self.custom_voice_users = {
+            # milk用のボイスID
+            "514786727634927647": os.environ.get("ELEVENLABS_VOICE_ID_milk"),
+            # hayane用のボイスID
+            "1223636376038412338": os.environ.get("ELEVENLABS_VOICE_ID_hayane"),
+        }
         db_init()
         print("[MAIN] Cogの初期化が完了しました")
 
@@ -78,7 +92,6 @@ class TTSandDB(commands.Cog):
         # if message.author == self.bot.user:
         #     return
 
-
         if message.content.startswith("$"):
             print(f"[MESSAGE] コマンドメッセージをスキップ: {message.content}")
             return
@@ -108,9 +121,13 @@ class TTSandDB(commands.Cog):
             if message.channel == voice_client.channel:
                 print("[TTS] ボイスチャット用メッセージを処理します")
                 # 特定のユーザーIDの場合はElevenLabsを使用
-                if str(message.author.id) == self.special_user_id:
-                    print(f"[SPECIAL USER] 特別なユーザー {message.author.name} のメッセージを処理します")
-                    await self.elevenlabs_tts.generate_tts(message.content)
+                user_id = str(message.author.id)
+                if user_id in self.custom_voice_users:
+                    voice_id = self.custom_voice_users[user_id]
+                    print(
+                        f"[SPECIAL USER] 特別なユーザー {message.author.name} のメッセージを処理します (Voice ID: {voice_id})"
+                    )
+                    await self.elevenlabs_tts.generate_tts(message.content, voice_id)
                     if not voice_client.is_playing():
                         await self.elevenlabs_tts.play_audio(voice_client)
                 else:

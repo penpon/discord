@@ -4,12 +4,6 @@ import cogs.main_cog as main_cog
 import cogs.general as general
 import os
 
-# 環境変数のデバッグ出力
-print("環境変数の確認:")
-print(f"TOKEN_MAN: {os.environ.get('TOKEN_MAN')}")
-print(f"ELEVENLABS_API_KEY: {os.environ.get('ELEVENLABS_API_KEY')}")
-print(f"ELEVENLABS_VOICE_ID: {os.environ.get('ELEVENLABS_VOICE_ID')}")
-
 # TOKEN = os.environ.get("TOKEN_MAN")
 TOKEN = os.environ.get("TOKEN_NU")
 
