@@ -9,3 +9,4 @@ venv/
 *.mp4
 *.wav
 hayato_db
+output.jsonl

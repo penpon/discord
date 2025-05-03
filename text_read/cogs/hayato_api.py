@@ -71,6 +71,9 @@ def ask_hayato(
             # コンテキストがある場合は結合
             if docs:
                 print(f"[HAYATO] {len(docs)}件の関連会話が見つかりました")
+                # 各関連会話の内容を表示
+                for idx, doc in enumerate(docs):
+                    print(f"[HAYATO] 関連会話 {idx+1}:\n{doc.page_content}\n")
                 context = "\n\n".join([doc.page_content for doc in docs])
             else:
                 print("[HAYATO] 関連する会話が見つかりませんでした")
