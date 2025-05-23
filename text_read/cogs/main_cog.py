@@ -342,22 +342,22 @@ class TTSandDB(commands.Cog):
             return
 
         if after.channel == self.voice.voice_channel:
-            text, speed = f"{member.display_name}さんが入室しました", 1.2
+            text, speed = f"{member.display_name}さんが入室", 1.3
         elif (
             before.channel == self.voice.voice_channel
             and after.channel != self.voice.voice_channel
         ):
-            text, speed = f"{member.display_name}さんが退出しました", 1.2
+            text, speed = f"{member.display_name}さんが退出", 1.3
         else:
             if after.channel is not None:
                 text, speed = (
-                    f"{after.channel.name}に{member.display_name}さんが入室しました",
-                    1.2,
+                    f"{after.channel.name}に{member.display_name}さんが入室",
+                    1.3,
                 )
             else:
                 text, speed = (
-                    f"{before.channel.name}から{member.display_name}さんが退出しました",
-                    1.2,
+                    f"{before.channel.name}から{member.display_name}さんが退出",
+                    1.3,
                 )
 
         print(f"[VOICE NOTICE] 通知メッセージを生成: {text}")
