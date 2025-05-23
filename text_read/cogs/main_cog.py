@@ -203,55 +203,63 @@ class TTSandDB(commands.Cog):
                             )
                             voice_client = message.guild.voice_client
                             # milkの音声IDを使用
-                            milk_voice_id = os.environ.get("ELEVENLABS_VOICE_ID_milk")
-                            if milk_voice_id:
-                                print(
-                                    f"[HAYATO TTS] hayatoの応答を音声で再生します: {response[:30]}..."
-                                )
-                                # 現在の再生を停止してから新しい音声を生成する
-                                if voice_client.is_playing():
-                                    voice_client.stop()
+                            # milk_voice_id = os.environ.get("ELEVENLABS_VOICE_ID_milk")
+                            # if milk_voice_id:
+                            #     print(
+                            #         f"[HAYATO TTS] hayatoの応答を音声で再生します: {response[:30]}..."
+                            #     )
+                            #     # 現在の再生を停止してから新しい音声を生成する
+                            #     if voice_client.is_playing():
+                            #         voice_client.stop()
 
-                                print(f"[HAYATO TTS DEBUG] 音声生成の前にデバッグ")
-                                print(
-                                    f"[HAYATO TTS DEBUG] milk_voice_id: {milk_voice_id}"
-                                )
-                                print(
-                                    f"[HAYATO TTS DEBUG] response: {response[:30]}..."
-                                )
+                            #     print(f"[HAYATO TTS DEBUG] 音声生成の前にデバッグ")
+                            #     print(
+                            #         f"[HAYATO TTS DEBUG] milk_voice_id: {milk_voice_id}"
+                            #     )
+                            #     print(
+                            #         f"[HAYATO TTS DEBUG] response: {response[:30]}..."
+                            #     )
 
-                                # 音声生成（自動キュー追加は無効化）
-                                try:
-                                    print(
-                                        f"[HAYATO TTS DEBUG] elevenlabs_tts.generate_ttsを呼び出します"
-                                    )
-                                    file_path = await self.elevenlabs_tts.generate_tts(
-                                        response, milk_voice_id, auto_queue=False
-                                    )
-                                    print(
-                                        f"[HAYATO TTS DEBUG] 生成結果のfile_path: {file_path}"
-                                    )
-                                except Exception as e:
-                                    print(f"[HAYATO TTS ERROR] 音声生成中に例外が発生しました: {e}")
-                                if file_path:
-                                    # キューに登録して再生
-                                    print(f"[HAYATO TTS] 音声ファイルをキューに追加します: {file_path}")
-                                    await self.elevenlabs_tts.audio_queue.put(file_path)
-                                    print(
-                                        f"[HAYATO TTS] キュー追加完了（現在のサイズ: {self.elevenlabs_tts.audio_queue.qsize()}）"
-                                    )
-                                    # 再生中でなければ再生を開始
-                                    if not voice_client.is_playing():
-                                        print(f"[HAYATO TTS] 再生を開始します")
-                                        await self.elevenlabs_tts.play_audio(
-                                            voice_client
-                                        )
-                                else:
-                                    print("[HAYATO TTS ERROR] 音声ファイルの生成に失敗しました")
-                            else:
-                                print(
-                                    "[HAYATO TTS ERROR] ELEVENLABS_VOICE_ID_milkが設定されていません"
-                                )
+                            #     # 音声生成（自動キュー追加は無効化）
+                            #     try:
+                            #         print(
+                            #             f"[HAYATO TTS DEBUG] elevenlabs_tts.generate_ttsを呼び出します"
+                            #         )
+                            #         file_path = await self.elevenlabs_tts.generate_tts(
+                            #             response, milk_voice_id, auto_queue=False
+                            #         )
+                            #         print(
+                            #             f"[HAYATO TTS DEBUG] 生成結果のfile_path: {file_path}"
+                            #         )
+                            #     except Exception as e:
+                            #         print(f"[HAYATO TTS ERROR] 音声生成中に例外が発生しました: {e}")
+                            #     if file_path:
+                            #         # キューに登録して再生
+                            #         print(f"[HAYATO TTS] 音声ファイルをキューに追加します: {file_path}")
+                            #         await self.elevenlabs_tts.audio_queue.put(file_path)
+                            #         print(
+                            #             f"[HAYATO TTS] キュー追加完了（現在のサイズ: {self.elevenlabs_tts.audio_queue.qsize()}）"
+                            #         )
+                            #         # 再生中でなければ再生を開始
+                            #         if not voice_client.is_playing():
+                            #             print(f"[HAYATO TTS] 再生を開始します")
+                            #             await self.elevenlabs_tts.play_audio(
+                            #                 voice_client
+                            #             )
+                            #     else:
+                            #         print("[HAYATO TTS ERROR] 音声ファイルの生成に失敗しました")
+                            # else:
+                            #     print(
+                            #         "[HAYATO TTS ERROR] ELEVENLABS_VOICE_ID_milkが設定されていません"
+                            #     )
+                            
+                            # 一旦通常のTTSを使用
+                            print(f"[HAYATO TTS] hayatoの応答を音声で再生します: {response[:30]}...")
+                            if voice_client.is_playing():
+                                voice_client.stop()
+                            await self.tts.generate_tts(response)
+                            if not voice_client.is_playing():
+                                await self.tts.play_audio(voice_client)
                     except Exception as e:
                         print(f"[HAYATO ERROR] 応答生成時にエラーが発生しました: {e}")
                         await message.channel.send("あれ？何かおかしいみたい。もう一度試してみて！")
@@ -275,38 +283,43 @@ class TTSandDB(commands.Cog):
             if message.channel == voice_client.channel:
                 print("[TTS] ボイスチャット用メッセージを処理します")
                 # 特定のユーザーIDの場合はElevenLabsを使用
-                user_id = str(message.author.id)
-                if user_id in self.custom_voice_users:
-                    voice_id = self.custom_voice_users[user_id]
-                    print(
-                        f"[SPECIAL USER] 特別なユーザー {message.author.name} のメッセージを処理します (Voice ID: {voice_id})"
-                    )
+                # user_id = str(message.author.id)
+                # if user_id in self.custom_voice_users:
+                #     voice_id = self.custom_voice_users[user_id]
+                #     print(
+                #         f"[SPECIAL USER] 特別なユーザー {message.author.name} のメッセージを処理します (Voice ID: {voice_id})"
+                #     )
 
-                    # 現在再生中の場合は停止
-                    if voice_client.is_playing():
-                        voice_client.stop()
-                        print("[TTS] 現在の再生を停止しました")
+                #     # 現在再生中の場合は停止
+                #     if voice_client.is_playing():
+                #         voice_client.stop()
+                #         print("[TTS] 現在の再生を停止しました")
 
-                    # 音声生成（自動キュー追加は無効化）
-                    file_path = await self.elevenlabs_tts.generate_tts(
-                        message.content, voice_id, auto_queue=False
-                    )
-                    if file_path:
-                        # キューに登録して再生
-                        print(f"[SPECIAL USER] 音声ファイルをキューに追加します: {file_path}")
-                        await self.elevenlabs_tts.audio_queue.put(file_path)
-                        print(
-                            f"[SPECIAL USER] キュー追加完了（現在のサイズ: {self.elevenlabs_tts.audio_queue.qsize()}）"
-                        )
-                        # 再生中でなければ再生を開始
-                        if not voice_client.is_playing():
-                            print(f"[SPECIAL USER] 再生を開始します")
-                            await self.elevenlabs_tts.play_audio(voice_client)
-                else:
-                    # 通常のユーザーは従来のTTSを使用
-                    await self.tts.generate_tts(message.content)
-                    if not voice_client.is_playing():
-                        await self.tts.play_audio(voice_client)
+                #     # 音声生成（自動キュー追加は無効化）
+                #     file_path = await self.elevenlabs_tts.generate_tts(
+                #         message.content, voice_id, auto_queue=False
+                #     )
+                #     if file_path:
+                #         # キューに登録して再生
+                #         print(f"[SPECIAL USER] 音声ファイルをキューに追加します: {file_path}")
+                #         await self.elevenlabs_tts.audio_queue.put(file_path)
+                #         print(
+                #             f"[SPECIAL USER] キュー追加完了（現在のサイズ: {self.elevenlabs_tts.audio_queue.qsize()}）"
+                #         )
+                #         # 再生中でなければ再生を開始
+                #         if not voice_client.is_playing():
+                #             print(f"[SPECIAL USER] 再生を開始します")
+                #             await self.elevenlabs_tts.play_audio(voice_client)
+                # else:
+                #     # 通常のユーザーは従来のTTSを使用
+                #     await self.tts.generate_tts(message.content)
+                #     if not voice_client.is_playing():
+                #         await self.tts.play_audio(voice_client)
+                
+                # 一旦全員通常のTTSを使用
+                await self.tts.generate_tts(message.content)
+                if not voice_client.is_playing():
+                    await self.tts.play_audio(voice_client)
 
     @commands.Cog.listener()
     async def on_voice_state_update(self, member, before, after):
