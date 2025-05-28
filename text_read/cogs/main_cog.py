@@ -4,7 +4,7 @@ from discord import VoiceClient, FFmpegPCMAudio
 import os
 from cogs.config import URL_PATTERN, LONG_NUMBER_PATTERN
 from cogs.database import db_init, save_message
-from cogs.hayato_api import ask_hayato
+# from cogs.hayato_api import ask_hayato
 from cogs.tts_handler import TTSHandler
 from cogs.elevenlabs_tts import ElevenLabsTTS
 from cogs.voice_commands import VoiceCommands
@@ -21,7 +21,7 @@ class TTSandDB(commands.Cog):
         self.special_user_id = "514786727634927647"  # 特別なユーザーID
         # 各機能のオン/オフフラグ
         self.hayato_tts_enabled = True  # 音声生成機能
-        self.hayato_reply_enabled = False  # リプライ応答機能 - 基本無効
+        # self.hayato_reply_enabled = False  # リプライ応答機能 - 基本無効
         # 環境変数のデバッグ出力
         print(
             f"[VOICE_ID DEBUG] ELEVENLABS_VOICE_ID_milk: {os.environ.get('ELEVENLABS_VOICE_ID_milk')}"
@@ -53,21 +53,21 @@ class TTSandDB(commands.Cog):
         self.tts.clear_queue()
         self.elevenlabs_tts.clear_queue()
 
-    @commands.command(name="toggle_hayato_reply")
-    async def toggle_hayato_reply(self, ctx):
-        """hayatoのリプライ応答機能をオン/オフするコマンド"""
-        # 指定されたユーザーIDのみコマンド実行を許可
-        if str(ctx.author.id) != self.special_user_id:
-            print(
-                f"[COMMAND] 権限がないユーザーがコマンドを実行しようとしました: {ctx.author.name} (ID: {ctx.author.id})"
-            )
-            await ctx.send("このコマンドは特定のユーザーのみが実行できます。")
-            return
+    # @commands.command(name="toggle_hayato_reply")
+    # async def toggle_hayato_reply(self, ctx):
+    #     """hayatoのリプライ応答機能をオン/オフするコマンド"""
+    #     # 指定されたユーザーIDのみコマンド実行を許可
+    #     if str(ctx.author.id) != self.special_user_id:
+    #         print(
+    #             f"[COMMAND] 権限がないユーザーがコマンドを実行しようとしました: {ctx.author.name} (ID: {ctx.author.id})"
+    #         )
+    #         await ctx.send("このコマンドは特定のユーザーのみが実行できます。")
+    #         return
 
-        self.hayato_reply_enabled = not self.hayato_reply_enabled
-        status = "有効" if self.hayato_reply_enabled else "無効"
-        print(f"[COMMAND] hayatoのリプライ応答機能を{status}に切り替えました: {ctx.author.name}")
-        # await ctx.send(f"hayato reply {status}")
+    #     self.hayato_reply_enabled = not self.hayato_reply_enabled
+    #     status = "有効" if self.hayato_reply_enabled else "無効"
+    #     print(f"[COMMAND] hayatoのリプライ応答機能を{status}に切り替えました: {ctx.author.name}")
+    #     # await ctx.send(f"hayato reply {status}")
 
     @commands.command(name="clear_bot")
     async def clear_bot(self, ctx, amount: int = 10):
@@ -170,101 +170,101 @@ class TTSandDB(commands.Cog):
             print(f"[MESSAGE] コマンドメッセージをスキップ: {message.content}")
             return
 
-        # メンション処理
-        if self.bot.user in message.mentions:
-            print(f"[MENTION] メンションを検出: {message.content[:50]}...")
-            print(
-                f"[MENTION DEBUG] hayato_reply_enabledフラグの状態: {self.hayato_reply_enabled}"
-            )
+        # # メンション処理
+        # if self.bot.user in message.mentions:
+        #     print(f"[MENTION] メンションを検出: {message.content[:50]}...")
+        #     print(
+        #         f"[MENTION DEBUG] hayato_reply_enabledフラグの状態: {self.hayato_reply_enabled}"
+        #     )
 
-            # リプライ応答機能が有効な場合のみ処理
-            if self.hayato_reply_enabled:
-                question = message.content.replace(f"<@{self.bot.user.id}>", "").strip()
-                if question:
-                    print(f"[HAYATO] hayatoに質問を送信します: {question[:30]}...")
-                    try:
-                        response = ask_hayato(question)
-                        await message.channel.send(response)
+        #     # リプライ応答機能が有効な場合のみ処理
+        #     if self.hayato_reply_enabled:
+        #         question = message.content.replace(f"<@{self.bot.user.id}>", "").strip()
+        #         if question:
+        #             print(f"[HAYATO] hayatoに質問を送信します: {question[:30]}...")
+        #             try:
+        #                 response = ask_hayato(question)
+        #                 await message.channel.send(response)
 
-                        # hayatoの応答をTTSで再生する処理 - すべてのユーザーが対象
-                        if (
-                            self.hayato_tts_enabled
-                            and self.voice.voice_channel
-                            and message.guild.voice_client
-                        ):
-                            print(
-                                f"[HAYATO TTS DEBUG] TTSが有効化されています: {self.hayato_tts_enabled}"
-                            )
-                            print(
-                                f"[HAYATO TTS DEBUG] ボイスチャンネル: {self.voice.voice_channel}"
-                            )
-                            print(
-                                f"[HAYATO TTS DEBUG] ギルドボイスクライアント: {message.guild.voice_client}"
-                            )
-                            voice_client = message.guild.voice_client
-                            # milkの音声IDを使用
-                            # milk_voice_id = os.environ.get("ELEVENLABS_VOICE_ID_milk")
-                            # if milk_voice_id:
-                            #     print(
-                            #         f"[HAYATO TTS] hayatoの応答を音声で再生します: {response[:30]}..."
-                            #     )
-                            #     # 現在の再生を停止してから新しい音声を生成する
-                            #     if voice_client.is_playing():
-                            #         voice_client.stop()
+        #                 # hayatoの応答をTTSで再生する処理 - すべてのユーザーが対象
+        #                 if (
+        #                     self.hayato_tts_enabled
+        #                     and self.voice.voice_channel
+        #                     and message.guild.voice_client
+        #                 ):
+        #                     print(
+        #                         f"[HAYATO TTS DEBUG] TTSが有効化されています: {self.hayato_tts_enabled}"
+        #                     )
+        #                     print(
+        #                         f"[HAYATO TTS DEBUG] ボイスチャンネル: {self.voice.voice_channel}"
+        #                     )
+        #                     print(
+        #                         f"[HAYATO TTS DEBUG] ギルドボイスクライアント: {message.guild.voice_client}"
+        #                     )
+        #                     voice_client = message.guild.voice_client
+        #                     # milkの音声IDを使用
+        #                     # milk_voice_id = os.environ.get("ELEVENLABS_VOICE_ID_milk")
+        #                     # if milk_voice_id:
+        #                     #     print(
+        #                     #         f"[HAYATO TTS] hayatoの応答を音声で再生します: {response[:30]}..."
+        #                     #     )
+        #                     #     # 現在の再生を停止してから新しい音声を生成する
+        #                     #     if voice_client.is_playing():
+        #                     #         voice_client.stop()
 
-                            #     print(f"[HAYATO TTS DEBUG] 音声生成の前にデバッグ")
-                            #     print(
-                            #         f"[HAYATO TTS DEBUG] milk_voice_id: {milk_voice_id}"
-                            #     )
-                            #     print(
-                            #         f"[HAYATO TTS DEBUG] response: {response[:30]}..."
-                            #     )
+        #                     #     print(f"[HAYATO TTS DEBUG] 音声生成の前にデバッグ")
+        #                     #     print(
+        #                     #         f"[HAYATO TTS DEBUG] milk_voice_id: {milk_voice_id}"
+        #                     #     )
+        #                     #     print(
+        #                     #         f"[HAYATO TTS DEBUG] response: {response[:30]}..."
+        #                     #     )
 
-                            #     # 音声生成（自動キュー追加は無効化）
-                            #     try:
-                            #         print(
-                            #             f"[HAYATO TTS DEBUG] elevenlabs_tts.generate_ttsを呼び出します"
-                            #         )
-                            #         file_path = await self.elevenlabs_tts.generate_tts(
-                            #             response, milk_voice_id, auto_queue=False
-                            #         )
-                            #         print(
-                            #             f"[HAYATO TTS DEBUG] 生成結果のfile_path: {file_path}"
-                            #         )
-                            #     except Exception as e:
-                            #         print(f"[HAYATO TTS ERROR] 音声生成中に例外が発生しました: {e}")
-                            #     if file_path:
-                            #         # キューに登録して再生
-                            #         print(f"[HAYATO TTS] 音声ファイルをキューに追加します: {file_path}")
-                            #         await self.elevenlabs_tts.audio_queue.put(file_path)
-                            #         print(
-                            #             f"[HAYATO TTS] キュー追加完了（現在のサイズ: {self.elevenlabs_tts.audio_queue.qsize()}）"
-                            #         )
-                            #         # 再生中でなければ再生を開始
-                            #         if not voice_client.is_playing():
-                            #             print(f"[HAYATO TTS] 再生を開始します")
-                            #             await self.elevenlabs_tts.play_audio(
-                            #                 voice_client
-                            #             )
-                            #     else:
-                            #         print("[HAYATO TTS ERROR] 音声ファイルの生成に失敗しました")
-                            # else:
-                            #     print(
-                            #         "[HAYATO TTS ERROR] ELEVENLABS_VOICE_ID_milkが設定されていません"
-                            #     )
+        #                     #     # 音声生成（自動キュー追加は無効化）
+        #                     #     try:
+        #                     #         print(
+        #                     #             f"[HAYATO TTS DEBUG] elevenlabs_tts.generate_ttsを呼び出します"
+        #                     #         )
+        #                     #         file_path = await self.elevenlabs_tts.generate_tts(
+        #                     #             response, milk_voice_id, auto_queue=False
+        #                     #         )
+        #                     #         print(
+        #                     #             f"[HAYATO TTS DEBUG] 生成結果のfile_path: {file_path}"
+        #                     #         )
+        #                     #     except Exception as e:
+        #                     #         print(f"[HAYATO TTS ERROR] 音声生成中に例外が発生しました: {e}")
+        #                     #     if file_path:
+        #                     #         # キューに登録して再生
+        #                     #         print(f"[HAYATO TTS] 音声ファイルをキューに追加します: {file_path}")
+        #                     #         await self.elevenlabs_tts.audio_queue.put(file_path)
+        #                     #         print(
+        #                     #             f"[HAYATO TTS] キュー追加完了（現在のサイズ: {self.elevenlabs_tts.audio_queue.qsize()}）"
+        #                     #         )
+        #                     #         # 再生中でなければ再生を開始
+        #                     #         if not voice_client.is_playing():
+        #                     #             print(f"[HAYATO TTS] 再生を開始します")
+        #                     #             await self.elevenlabs_tts.play_audio(
+        #                     #                 voice_client
+        #                     #             )
+        #                     #     else:
+        #                     #         print("[HAYATO TTS ERROR] 音声ファイルの生成に失敗しました")
+        #                     # else:
+        #                     #     print(
+        #                     #         "[HAYATO TTS ERROR] ELEVENLABS_VOICE_ID_milkが設定されていません"
+        #                     #     )
                             
-                            # 一旦通常のTTSを使用
-                            print(f"[HAYATO TTS] hayatoの応答を音声で再生します: {response[:30]}...")
-                            if voice_client.is_playing():
-                                voice_client.stop()
-                            await self.tts.generate_tts(response)
-                            if not voice_client.is_playing():
-                                await self.tts.play_audio(voice_client)
-                    except Exception as e:
-                        print(f"[HAYATO ERROR] 応答生成時にエラーが発生しました: {e}")
-                        await message.channel.send("あれ？何かおかしいみたい。もう一度試してみて！")
-            else:
-                print(f"[HAYATO] リプライ応答機能が無効化されているため、応答しません")
+        #                     # 一旦通常のTTSを使用
+        #                     print(f"[HAYATO TTS] hayatoの応答を音声で再生します: {response[:30]}...")
+        #                     if voice_client.is_playing():
+        #                         voice_client.stop()
+        #                     await self.tts.generate_tts(response)
+        #                     if not voice_client.is_playing():
+        #                         await self.tts.play_audio(voice_client)
+        #             except Exception as e:
+        #                 print(f"[HAYATO ERROR] 応答生成時にエラーが発生しました: {e}")
+        #                 await message.channel.send("あれ？何かおかしいみたい。もう一度試してみて！")
+        #     else:
+        #         print(f"[HAYATO] リプライ応答機能が無効化されているため、応答しません")
 
         # 不適切なメッセージのフィルタリング
         if URL_PATTERN.search(message.content):
