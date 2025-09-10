@@ -338,6 +338,9 @@ class TTSandDB(commands.Cog):
         )
         if not voice_client:
             return
+        # 未接続状態ではTTS生成・再生を行わない
+        if not getattr(voice_client, "is_connected", None) or not voice_client.is_connected():
+            return
 
         if after.channel == self.voice.voice_channel:
             text, speed = f"{member.display_name}さんが入室", 1.3

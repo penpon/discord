@@ -26,6 +26,10 @@ class TTSHandler:
     async def play_audio(self, voice_client):
         """音声再生のメイン処理"""
         print("[TTS] 音声再生処理を開始します")
+        # 接続確認
+        if not getattr(voice_client, "is_connected", None) or not voice_client.is_connected():
+            print("[TTS] VoiceClientが未接続のため再生を中止します")
+            return
         while not self.audio_queue.empty():
             if voice_client.is_playing():
                 print("[TTS] 現在再生中のため待機します...")
@@ -47,6 +51,10 @@ class TTSHandler:
     def _queue_next(self, voice_client):
         """次の音声を再生するためのコールバック"""
         print("[TTS] 次の音声をチェックします")
+        # 接続確認
+        if not getattr(voice_client, "is_connected", None) or not voice_client.is_connected():
+            print("[TTS] VoiceClient未接続のため次の再生をスキップします")
+            return
         if not self.audio_queue.empty():
             print("[TTS] 次の音声を再生開始します")
             asyncio.run_coroutine_threadsafe(
