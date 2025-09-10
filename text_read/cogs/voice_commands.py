@@ -7,9 +7,12 @@ import time
 
 
 class VoiceCommands:
-    def __init__(self, bot):
+    def __init__(self, bot, tts_handler=None, elevenlabs_tts=None):
         print("[VOICE] ボイスコマンドを初期化します")
         self.bot = bot
+        # TTSハンドラー参照（切断時にキューをクリアするため）
+        self.tts = tts_handler
+        self.elevenlabs_tts = elevenlabs_tts
         self.voice_channel = None
         # 接続制御と自動退出の安定化用フラグ
         self._connect_lock = asyncio.Lock()
@@ -59,6 +62,15 @@ class VoiceCommands:
                 voice_client.stop()
                 # ffmpegのクリーンアップ競合を避けるため、短く待機
                 await asyncio.sleep(0.2)
+            # 切断時は常にTTSキューをクリア
+            try:
+                if self.tts:
+                    self.tts.clear_queue()
+                if self.elevenlabs_tts:
+                    self.elevenlabs_tts.clear_queue()
+                print("[VOICE] TTSキューをクリアしました")
+            except Exception as e:
+                print(f"[VOICE WARNING] TTSキュークリア中にエラー: {e}")
             await voice_client.disconnect()
             print("[VOICE] ボイスチャンネルから正常に退出しました")
         except Exception as e:

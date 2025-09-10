@@ -17,7 +17,7 @@ class TTSandDB(commands.Cog):
         self.bot = bot
         self.tts = TTSHandler()
         self.elevenlabs_tts = ElevenLabsTTS()
-        self.voice = VoiceCommands(bot)
+        self.voice = VoiceCommands(bot, tts_handler=self.tts, elevenlabs_tts=self.elevenlabs_tts)
         self.special_user_id = "514786727634927647"  # 特別なユーザーID
         # 各機能のオン/オフフラグ
         self.hayato_tts_enabled = True  # 音声生成機能
@@ -50,8 +50,6 @@ class TTSandDB(commands.Cog):
         """ボイスチャンネルから退出するコマンド"""
         print(f"[COMMAND] leaveコマンドが実行されました: {ctx.author.name}")
         await self.voice.leave(ctx)
-        self.tts.clear_queue()
-        self.elevenlabs_tts.clear_queue()
 
     # @commands.command(name="toggle_hayato_reply")
     # async def toggle_hayato_reply(self, ctx):
