@@ -53,7 +53,7 @@ class VoiceCommands:
             print("[VOICE] 最後のメンバーになったため退出します")
             await self._cleanup_voice(voice_client)
 
-    async def _cleanup_voice(self, voice_client: VoiceClient):
+    async def _cleanup_voice(self, voice_client: VoiceClient, preserve_queue: bool = False):
         """音声接続のクリーンアップ"""
         try:
             print("[VOICE] 音声接続をクリーンアップします")
@@ -62,15 +62,16 @@ class VoiceCommands:
                 voice_client.stop()
                 # ffmpegのクリーンアップ競合を避けるため、短く待機
                 await asyncio.sleep(0.2)
-            # 切断時は常にTTSキューをクリア
-            try:
-                if self.tts:
-                    self.tts.clear_queue()
-                if self.elevenlabs_tts:
-                    self.elevenlabs_tts.clear_queue()
-                print("[VOICE] TTSキューをクリアしました")
-            except Exception as e:
-                print(f"[VOICE WARNING] TTSキュークリア中にエラー: {e}")
+            # 切断時のTTSキュー扱い
+            if not preserve_queue:
+                try:
+                    if self.tts:
+                        self.tts.clear_queue()
+                    if self.elevenlabs_tts:
+                        self.elevenlabs_tts.clear_queue()
+                    print("[VOICE] TTSキューをクリアしました")
+                except Exception as e:
+                    print(f"[VOICE WARNING] TTSキュークリア中にエラー: {e}")
             await voice_client.disconnect()
             print("[VOICE] ボイスチャンネルから正常に退出しました")
         except Exception as e:
@@ -97,12 +98,52 @@ class VoiceCommands:
                     if voice_client.channel != target_channel:
                         print("[VOICE] 別のボイスチャンネルに接続中のため移動します")
                         await voice_client.move_to(target_channel)
-                        print("[VOICE] 移動が完了しました")
+                        # 安定待機（0.2s間隔 最大2s）
+                        deadline = time.time() + 2.0
+                        stabilized = False
+                        while time.time() < deadline:
+                            vc = ctx.guild.voice_client
+                            if vc and getattr(vc, "is_connected", None) and vc.is_connected() and vc.channel == target_channel:
+                                stabilized = True
+                                break
+                            await asyncio.sleep(0.2)
+                        if not stabilized:
+                            print("[VOICE WARN] move_to後に安定接続を確認できませんでした。フォールバックを実施します")
+                            try:
+                                # フォールバック：キュー保持でクリーンアップ→クールダウン→新規接続
+                                await self._cleanup_voice(voice_client, preserve_queue=True)
+                            except Exception as e:
+                                print(f"[VOICE WARNING] フォールバック前クリーンアップ中に例外: {e}")
+                            await asyncio.sleep(0.5)  # フォールバック前クールダウン
+                            print("[VOICE] フォールバック接続を開始します")
+                            await target_channel.connect()
+                            # 再度 安定待機（0.2s間隔 最大2s）
+                            deadline = time.time() + 2.0
+                            stabilized = False
+                            while time.time() < deadline:
+                                vc = ctx.guild.voice_client
+                                if vc and getattr(vc, "is_connected", None) and vc.is_connected() and vc.channel == target_channel:
+                                    stabilized = True
+                                    break
+                                await asyncio.sleep(0.2)
+                            if stabilized:
+                                print("[VOICE] フォールバック接続が安定しました")
+                            else:
+                                print("[VOICE ERROR] フォールバック後も安定接続を確認できませんでした")
+                        else:
+                            print("[VOICE] 移動が完了し、接続が安定しました")
                     else:
                         print("[VOICE] 既に対象のボイスチャンネルに接続済みです")
                 else:
                     print("[VOICE] ボイスチャンネルに接続します")
                     await target_channel.connect()
+                    # 新規接続時も念のため短い安定待機（0.2s間隔 最大2s）
+                    deadline = time.time() + 2.0
+                    while time.time() < deadline:
+                        vc = ctx.guild.voice_client
+                        if vc and getattr(vc, "is_connected", None) and vc.is_connected() and vc.channel == target_channel:
+                            break
+                        await asyncio.sleep(0.2)
 
                 self.voice_channel = target_channel
                 self.last_active = time.time()

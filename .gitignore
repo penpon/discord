@@ -10,3 +10,4 @@ venv/
 *.wav
 hayato_db
 output.jsonl
+.serena/
