@@ -4,9 +4,11 @@ from discord import VoiceClient, FFmpegPCMAudio
 import os
 from cogs.config import URL_PATTERN, LONG_NUMBER_PATTERN
 from cogs.database import db_init, save_message
+
 # from cogs.hayato_api import ask_hayato
 from cogs.tts_handler import TTSHandler
-from cogs.elevenlabs_tts import ElevenLabsTTS
+
+# from cogs.elevenlabs_tts import ElevenLabsTTS  # ElevenLabs は一時停止中のため無効化
 from cogs.voice_commands import VoiceCommands
 import asyncio
 
@@ -16,26 +18,22 @@ class TTSandDB(commands.Cog):
         print("[MAIN] Cogの初期化を開始します")
         self.bot = bot
         self.tts = TTSHandler()
-        self.elevenlabs_tts = ElevenLabsTTS()
-        self.voice = VoiceCommands(bot, tts_handler=self.tts, elevenlabs_tts=self.elevenlabs_tts)
-        self.special_user_id = "514786727634927647"  # 特別なユーザーID
+        self.voice = VoiceCommands(bot, tts_handler=self.tts)  # ElevenLabs を渡さない
+        # self.elevenlabs_tts = ElevenLabsTTS()  # ElevenLabs は一時停止
+        # self.special_user_id = "514786727634927647"  # 特別なユーザーID
         # 各機能のオン/オフフラグ
-        self.hayato_tts_enabled = True  # 音声生成機能
+        # self.hayato_tts_enabled = True  # 音声生成機能
         # self.hayato_reply_enabled = False  # リプライ応答機能 - 基本無効
         # 環境変数のデバッグ出力
-        print(
-            f"[VOICE_ID DEBUG] ELEVENLABS_VOICE_ID_milk: {os.environ.get('ELEVENLABS_VOICE_ID_milk')}"
-        )
-        print(
-            f"[VOICE_ID DEBUG] ELEVENLABS_VOICE_ID_hayane: {os.environ.get('ELEVENLABS_VOICE_ID_hayane')}"
-        )
+        # print(f"[VOICE_ID DEBUG] ELEVENLABS_VOICE_ID_milk: {os.environ.get('ELEVENLABS_VOICE_ID_milk')}")
+        # print(f"[VOICE_ID DEBUG] ELEVENLABS_VOICE_ID_hayane: {os.environ.get('ELEVENLABS_VOICE_ID_hayane')}")
 
-        self.custom_voice_users = {
-            # milk用のボイスID
-            "514786727634927647": os.environ.get("ELEVENLABS_VOICE_ID_milk"),
-            # hayane用のボイスID
-            "1223636376038412338": os.environ.get("ELEVENLABS_VOICE_ID_hayane"),
-        }
+        # self.custom_voice_users = {
+        #     # milk用のボイスID
+        #     "514786727634927647": os.environ.get("ELEVENLABS_VOICE_ID_milk"),
+        #     # hayane用のボイスID
+        #     "1223636376038412338": os.environ.get("ELEVENLABS_VOICE_ID_hayane"),
+        # }
         db_init()
         print("[MAIN] Cogの初期化が完了しました")
 
@@ -250,7 +248,7 @@ class TTSandDB(commands.Cog):
         #                     #     print(
         #                     #         "[HAYATO TTS ERROR] ELEVENLABS_VOICE_ID_milkが設定されていません"
         #                     #     )
-                            
+
         #                     # 一旦通常のTTSを使用
         #                     print(f"[HAYATO TTS] hayatoの応答を音声で再生します: {response[:30]}...")
         #                     if voice_client.is_playing():
@@ -313,7 +311,7 @@ class TTSandDB(commands.Cog):
                 #     await self.tts.generate_tts(message.content)
                 #     if not voice_client.is_playing():
                 #         await self.tts.play_audio(voice_client)
-                
+
                 # 一旦全員通常のTTSを使用
                 await self.tts.generate_tts(message.content)
                 if not voice_client.is_playing():
@@ -339,7 +337,10 @@ class TTSandDB(commands.Cog):
         if not voice_client:
             return
         # 未接続状態ではTTS生成・再生を行わない
-        if not getattr(voice_client, "is_connected", None) or not voice_client.is_connected():
+        if (
+            not getattr(voice_client, "is_connected", None)
+            or not voice_client.is_connected()
+        ):
             return
 
         if after.channel == self.voice.voice_channel:

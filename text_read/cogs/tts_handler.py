@@ -10,14 +10,20 @@ class TTSHandler:
         print("[TTS] TTSハンドラーを初期化します")
         self.audio_queue = asyncio.Queue()
 
+    def _synthesize_tts(self, text: str) -> io.BytesIO:
+        """同期処理: gTTSで音声を生成（スレッドにオフロードして呼び出す）"""
+        tts = gTTS(text=text, lang="ja")
+        audio_data = io.BytesIO()
+        tts.write_to_fp(audio_data)
+        audio_data.seek(0)
+        return audio_data
+
     async def generate_tts(self, text: str, speed: float = 1.0):
         """TTS音声の生成とキュー追加"""
         print(f"[TTS] 音声生成を開始: {text[:20]}... (速度: {speed}x)")
         try:
-            tts = gTTS(text=text, lang="ja")
-            audio_data = io.BytesIO()
-            tts.write_to_fp(audio_data)
-            audio_data.seek(0)
+            # gTTSは同期I/Oのためイベントループをブロックしないようスレッドにオフロード
+            audio_data = await asyncio.to_thread(self._synthesize_tts, text)
             await self.audio_queue.put((audio_data, speed))
             print(f"[TTS] キューに追加しました（現在のキューサイズ: {self.audio_queue.qsize()}）")
         except Exception as e:

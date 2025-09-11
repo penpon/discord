@@ -9,6 +9,7 @@ TOKEN = os.environ.get("TOKEN_NU")
 
 intents = discord.Intents.default()
 intents.message_content = True
+intents.voice_states = True
 # intents = discord.Intents.all()
 # client = discord.Client(intents=intents)
 
