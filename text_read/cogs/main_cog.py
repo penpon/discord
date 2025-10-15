@@ -3,7 +3,14 @@ from discord.ext import commands
 from discord import VoiceClient, FFmpegPCMAudio
 import os
 from cogs.config import URL_PATTERN, LONG_NUMBER_PATTERN
-from cogs.database import db_init, save_message
+from cogs.database import (
+    db_init,
+    save_message,
+    set_user_profile,
+    get_user_profile,
+    delete_user_profile,
+    list_user_profiles,
+)
 
 # from cogs.hayato_api import ask_hayato
 from cogs.tts_handler import TTSHandler
@@ -13,6 +20,15 @@ from cogs.voice_commands import VoiceCommands
 import asyncio
 
 
+# TTSプロファイル定義（0=デフォルト、1〜3=ユーザー1〜3）
+TTS_PROFILES = {
+    0: None,  # デフォルト（フィルタなし）
+    1: "equalizer=f=800:t=q:w=1.0:g=0,equalizer=f=4000:t=q:w=1.0:g=3,acompressor=threshold=-18dB:ratio=2:attack=5:release=50,alimiter=limit=0.9",  # 明瞭・ニュース調
+    2: "asetrate=48000*1.059,aresample=48000,atempo=0.708,equalizer=f=3000:t=q:w=1.0:g=3",  # 明るめ・速め
+    3: "asetrate=48000*0.943,aresample=48000,atempo=1.060,equalizer=f=200:t=q:w=1.0:g=2,equalizer=f=3000:t=q:w=1.0:g=-2",  # 低め・標準速度
+}
+
+
 class TTSandDB(commands.Cog):
     def __init__(self, bot):
         print("[MAIN] Cogの初期化を開始します")
@@ -20,7 +36,7 @@ class TTSandDB(commands.Cog):
         self.tts = TTSHandler()
         self.voice = VoiceCommands(bot, tts_handler=self.tts)  # ElevenLabs を渡さない
         # self.elevenlabs_tts = ElevenLabsTTS()  # ElevenLabs は一時停止
-        # self.special_user_id = "514786727634927647"  # 特別なユーザーID
+        self.special_user_id = "514786727634927647"  # 特別なユーザーID
         # 各機能のオン/オフフラグ
         # self.hayato_tts_enabled = True  # 音声生成機能
         # self.hayato_reply_enabled = False  # リプライ応答機能 - 基本無効
@@ -117,6 +133,90 @@ class TTSandDB(commands.Cog):
         except Exception as e:
             await ctx.send(f"メッセージの削除中にエラーが発生しました: {e}")
             print(f"[COMMAND ERROR] メッセージ削除中にエラー: {e}")
+
+    @commands.command(name="tts_profile_set")
+    async def tts_profile_set(self, ctx, user: commands.MemberConverter, profile: int):
+        """ユーザーにTTSプロファイルを割り当て（特定ユーザー限定）"""
+        # 特定ユーザーIDのみコマンド実行を許可
+        if str(ctx.author.id) != self.special_user_id:
+            print(f"[COMMAND] 権限がないユーザーがコマンドを実行しようとしました: {ctx.author.name} (ID: {ctx.author.id})")
+            await ctx.send("このコマンドは特定のユーザーのみが実行できます。")
+            return
+        
+        print(f"[COMMAND] tts_profile_setコマンドを実行: {ctx.author.name} -> {user.name} = {profile}")
+        
+        # プロファイル番号の検証
+        if profile not in TTS_PROFILES:
+            await ctx.send(f"❌ プロファイル番号は0〜3の範囲で指定してください。")
+            return
+        
+        # DBに保存
+        set_user_profile(str(user.id), profile)
+        
+        profile_names = ["デフォルト", "ユーザー1（明瞭・ニュース調）", "ユーザー2（明るめ・速め）", "ユーザー3（低め・標準速度）"]
+        await ctx.send(f"✅ {user.mention} のTTSプロファイルを **{profile_names[profile]}** に設定しました。")
+    
+    @commands.command(name="tts_profile_clear")
+    async def tts_profile_clear(self, ctx, user: commands.MemberConverter):
+        """ユーザーのTTSプロファイル割当を削除（特定ユーザー限定）"""
+        # 特定ユーザーIDのみコマンド実行を許可
+        if str(ctx.author.id) != self.special_user_id:
+            print(f"[COMMAND] 権限がないユーザーがコマンドを実行しようとしました: {ctx.author.name} (ID: {ctx.author.id})")
+            await ctx.send("このコマンドは特定のユーザーのみが実行できます。")
+            return
+        
+        print(f"[COMMAND] tts_profile_clearコマンドを実行: {ctx.author.name} -> {user.name}")
+        
+        delete_user_profile(str(user.id))
+        await ctx.send(f"✅ {user.mention} のTTSプロファイル割当を削除しました（デフォルトに戻ります）。")
+    
+    @commands.command(name="tts_profile_show")
+    async def tts_profile_show(self, ctx, user: commands.MemberConverter = None):
+        """ユーザーの現在のTTSプロファイルを表示"""
+        target_user = user or ctx.author
+        print(f"[COMMAND] tts_profile_showコマンドを実行: {ctx.author.name} -> {target_user.name}")
+        
+        profile = get_user_profile(str(target_user.id))
+        if profile is None:
+            profile = 0  # 未登録はデフォルト扱い
+        if profile not in TTS_PROFILES:
+            profile = 0
+        
+        profile_names = ["デフォルト", "ユーザー1（明瞭・ニュース調）", "ユーザー2（明るめ・やや高め）", "ユーザー3（低め・落ち着き）"]
+        await ctx.send(f"🔊 {target_user.mention} のTTSプロファイル: **{profile_names[profile]}** (ID: {profile})")
+    
+    @commands.command(name="tts_profile_list")
+    async def tts_profile_list(self, ctx):
+        """全ユーザーのTTSプロファイル割当一覧を表示（特定ユーザー限定）"""
+        # 特定ユーザーIDのみコマンド実行を許可
+        if str(ctx.author.id) != self.special_user_id:
+            print(f"[COMMAND] 権限がないユーザーがコマンドを実行しようとしました: {ctx.author.name} (ID: {ctx.author.id})")
+            await ctx.send("このコマンドは特定のユーザーのみが実行できます。")
+            return
+        
+        print(f"[COMMAND] tts_profile_listコマンドを実行: {ctx.author.name}")
+        
+        profiles = list_user_profiles()
+        
+        if not profiles:
+            await ctx.send("📋 現在、プロファイルが割り当てられているユーザーはいません。")
+            return
+        
+        profile_names = ["デフォルト", "ユーザー1", "ユーザー2", "ユーザー3"]
+        
+        # ユーザー名を取得して表示
+        lines = ["📋 **TTSプロファイル割当一覧**"]
+        for user_id, profile_id in profiles:
+            try:
+                user = await self.bot.fetch_user(int(user_id))
+                user_name = user.name
+            except:
+                user_name = f"Unknown (ID: {user_id})"
+            
+            display_id = profile_id if profile_id in TTS_PROFILES else 0
+            lines.append(f"・{user_name}: {profile_names[display_id]} (ID: {display_id})")
+        
+        await ctx.send("\n".join(lines))
 
     @commands.command(name="play")
     async def play(self, ctx, command_name: str):
@@ -278,42 +378,22 @@ class TTSandDB(commands.Cog):
             voice_client = message.guild.voice_client
             if message.channel == voice_client.channel:
                 print("[TTS] ボイスチャット用メッセージを処理します")
-                # 特定のユーザーIDの場合はElevenLabsを使用
-                # user_id = str(message.author.id)
-                # if user_id in self.custom_voice_users:
-                #     voice_id = self.custom_voice_users[user_id]
-                #     print(
-                #         f"[SPECIAL USER] 特別なユーザー {message.author.name} のメッセージを処理します (Voice ID: {voice_id})"
-                #     )
-
-                #     # 現在再生中の場合は停止
-                #     if voice_client.is_playing():
-                #         voice_client.stop()
-                #         print("[TTS] 現在の再生を停止しました")
-
-                #     # 音声生成（自動キュー追加は無効化）
-                #     file_path = await self.elevenlabs_tts.generate_tts(
-                #         message.content, voice_id, auto_queue=False
-                #     )
-                #     if file_path:
-                #         # キューに登録して再生
-                #         print(f"[SPECIAL USER] 音声ファイルをキューに追加します: {file_path}")
-                #         await self.elevenlabs_tts.audio_queue.put(file_path)
-                #         print(
-                #             f"[SPECIAL USER] キュー追加完了（現在のサイズ: {self.elevenlabs_tts.audio_queue.qsize()}）"
-                #         )
-                #         # 再生中でなければ再生を開始
-                #         if not voice_client.is_playing():
-                #             print(f"[SPECIAL USER] 再生を開始します")
-                #             await self.elevenlabs_tts.play_audio(voice_client)
-                # else:
-                #     # 通常のユーザーは従来のTTSを使用
-                #     await self.tts.generate_tts(message.content)
-                #     if not voice_client.is_playing():
-                #         await self.tts.play_audio(voice_client)
-
-                # 一旦全員通常のTTSを使用
-                await self.tts.generate_tts(message.content)
+                
+                # ユーザーのTTSプロファイルを取得
+                user_id = str(message.author.id)
+                profile_id = get_user_profile(user_id)
+                if profile_id is None:
+                    profile_id = 0  # 未登録はデフォルト
+                if profile_id not in TTS_PROFILES:
+                    profile_id = 0
+                
+                # プロファイルからフィルタを取得
+                ffmpeg_filter = TTS_PROFILES.get(profile_id)
+                print(f"[TTS] ユーザー {message.author.name} のプロファイル: {profile_id}, フィルタ: {ffmpeg_filter}")
+                
+                # TTS生成とキュー追加（プロファイルフィルタを適用）
+                playback_speed = 1.75 if profile_id == 1 else 1.0
+                await self.tts.generate_tts(message.content, speed=playback_speed, ffmpeg_filter=ffmpeg_filter)
                 if not voice_client.is_playing():
                     await self.tts.play_audio(voice_client)
 

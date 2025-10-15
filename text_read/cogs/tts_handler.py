@@ -18,13 +18,13 @@ class TTSHandler:
         audio_data.seek(0)
         return audio_data
 
-    async def generate_tts(self, text: str, speed: float = 1.0):
+    async def generate_tts(self, text: str, speed: float = 1.0, ffmpeg_filter: str = None):
         """TTS音声の生成とキュー追加"""
-        print(f"[TTS] 音声生成を開始: {text[:20]}... (速度: {speed}x)")
+        print(f"[TTS] 音声生成を開始: {text[:20]}... (速度: {speed}x, フィルタ: {ffmpeg_filter})")
         try:
             # gTTSは同期I/Oのためイベントループをブロックしないようスレッドにオフロード
             audio_data = await asyncio.to_thread(self._synthesize_tts, text)
-            await self.audio_queue.put((audio_data, speed))
+            await self.audio_queue.put((audio_data, speed, ffmpeg_filter))
             print(f"[TTS] キューに追加しました（現在のキューサイズ: {self.audio_queue.qsize()}）")
         except Exception as e:
             print(f"[TTS ERROR] 音声生成に失敗しました: {str(e)}")
@@ -42,12 +42,29 @@ class TTSHandler:
                 await asyncio.sleep(0.5)
                 continue
 
-            audio_data, speed = await self.audio_queue.get()
+            audio_data, speed, ffmpeg_filter = await self.audio_queue.get()
             try:
-                print(f"[TTS] 再生を開始します（速度: {speed}x）")
+                # FFmpegフィルタチェーンの構築
+                filter_chain = []
+                
+                # プロファイルフィルタを追加
+                if ffmpeg_filter:
+                    filter_chain.append(ffmpeg_filter)
+                
+                # 速度調整を追加（デフォルト速度1.0以外の場合）
+                if speed != 1.0:
+                    filter_chain.append(f"atempo={speed}")
+                
+                # フィルタチェーンを結合
+                if filter_chain:
+                    options = f"-af {','.join(filter_chain)}"
+                else:
+                    options = ""
+                
+                print(f"[TTS] 再生を開始します（速度: {speed}x, options: {options}）")
                 voice_client.play(
                     FFmpegPCMAudio(
-                        audio_data, pipe=True, options=f"-af atempo={speed}"
+                        audio_data, pipe=True, options=options if options else None
                     ),
                     after=lambda e: self._queue_next(voice_client),
                 )
