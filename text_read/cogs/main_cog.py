@@ -23,7 +23,7 @@ import asyncio
 # TTSプロファイル定義（0=デフォルト、1〜3=ユーザー1〜3）
 TTS_PROFILES = {
     0: None,  # デフォルト（フィルタなし）
-    1: "equalizer=f=800:t=q:w=1.0:g=0,equalizer=f=4000:t=q:w=1.0:g=3,acompressor=threshold=-18dB:ratio=2:attack=5:release=50,alimiter=limit=0.9,atempo=1.65",  # 明瞭・ニュース調・速め
+    1: "equalizer=f=800:t=q:w=1.0:g=0,equalizer=f=4000:t=q:w=1.0:g=3,acompressor=threshold=-18dB:ratio=2:attack=5:release=50,alimiter=limit=0.9,atempo=1.55",  # 明瞭・ニュース調・速め
     2: "asetrate=48000*1.059,aresample=48000,atempo=0.60,equalizer=f=3000:t=q:w=1.0:g=3",  # 明るめ・ゆっくり
     3: "asetrate=48000*0.943,aresample=48000,atempo=1.060,equalizer=f=200:t=q:w=1.0:g=2,equalizer=f=3000:t=q:w=1.0:g=-2",  # 低め・標準速度
 }
