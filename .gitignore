@@ -11,3 +11,6 @@ venv/
 hayato_db
 output.jsonl
 .serena/
+text_read/sounds
+*.log
+*.txt

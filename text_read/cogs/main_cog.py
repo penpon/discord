@@ -222,7 +222,8 @@ class TTSandDB(commands.Cog):
     async def play(self, ctx, command_name: str):
         """指定されたコマンドに対応する音声ファイルを再生するコマンド"""
         # 許可されたコマンドとファイルのマッピング
-        ALLOWED_FILES = {"とにかくやれ": "とにかくやれ.mp3"}
+         # ALLOWED_FILES = {"とにかくやれ": "とにかくやれ.mp3", "ぬの歌": "ぬの歌.mp3", "はやねの歌": "はやねの歌.mp3", "なつきの歌": "なつきの歌.mp3", "めむむの歌": "めむむの歌.mp3"}
+        ALLOWED_FILES = {"ぬの歌": "ぬの歌.mp3", "はやねの歌": "はやねの歌.mp3", "なつきの歌": "なつきの歌.mp3", "めむむの歌": "めむむの歌.mp3"}
 
         # ユーザーがボイスチャンネルに参加しているか確認
         if not ctx.author.voice:
