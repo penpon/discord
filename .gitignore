@@ -13,3 +13,4 @@ output.jsonl
 .serena/
 *.log
 *.txt
+!text_read/sounds/*.txt
