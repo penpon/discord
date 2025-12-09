@@ -257,10 +257,8 @@ class TTSandDB(commands.Cog):
             if error:
                 print(f"[VOICE ERROR] 再生エラー: {error}")
             
-            # 再生終了後のクリーンアップ処理（スレッド削除など）
-            # スレッドIDが保存されているか確認する必要があるため、インスタンス変数または
-            # create_taskで非同期処理をスケジュールする
-            coro = self._cleanup_lyrics_thread(ctx)
+            # 再生終了後のクリーンアップ処理（歌詞メッセージ削除）
+            coro = self._cleanup_lyrics_messages(ctx)
             fut = asyncio.run_coroutine_threadsafe(coro, self.bot.loop)
             try:
                 fut.result()
@@ -269,73 +267,56 @@ class TTSandDB(commands.Cog):
 
         voice_client.play(audio_source, after=after_playing)
         
-        # 歌詞ファイルの確認とスレッド作成
+        # 歌詞ファイルの確認とメッセージ送信
         txt_filename = filename.rsplit('.', 1)[0] + '.txt'
         txt_path = os.path.join("sounds", txt_filename)
+        
+        # クリーンアップ用にメッセージ情報を保存する辞書を初期化
+        if not hasattr(self, 'active_lyrics_messages'):
+            self.active_lyrics_messages = {}
+        
+        lyrics_messages = []
         
         if os.path.exists(txt_path):
             try:
                 with open(txt_path, 'r', encoding='utf-8') as f:
                     lyrics_content = f.read()
                 
-                # スレッド作成元のメッセージを送信
+                # 再生中メッセージを送信
                 now_playing_msg = await ctx.send(f"🎵 **{command_name}** を再生中...")
+                lyrics_messages.append(now_playing_msg)
                 
-                # スレッドを作成 (auto_archive_duration=60 は1時間だが、手動でアーカイブ/削除予定)
-                thread = await now_playing_msg.create_thread(
-                    name=f"Lyrics: {command_name}",
-                    auto_archive_duration=60
-                )
-                
-                # 歌詞を投稿 (2000文字制限を考慮して分割投稿が必要かもしれないが、一旦そのまま)
-                # 長すぎる場合は分割するロジックを入れるのが安全
+                # 歌詞を投稿 (2000文字制限を考慮して分割投稿)
                 if len(lyrics_content) > 1900:
                     for i in range(0, len(lyrics_content), 1900):
-                        await thread.send(lyrics_content[i:i+1900])
+                        msg = await ctx.send(lyrics_content[i:i+1900])
+                        lyrics_messages.append(msg)
                 else:
-                    await thread.send(lyrics_content)
+                    msg = await ctx.send(lyrics_content)
+                    lyrics_messages.append(msg)
                 
-                # クリーンアップ用にスレッド情報を保存 (簡易的な実装としてctxに紐付けるか、辞書で管理)
-                # ctxオブジェクト自体は永続しない可能性があるため、辞書管理が望ましいが
-                # ここでは簡易的にクラス変数で管理する
-                if not hasattr(self, 'active_lyrics_threads'):
-                    self.active_lyrics_threads = {}
-                
-                self.active_lyrics_threads[ctx.guild.id] = thread
+                # クリーンアップ用にメッセージ情報を保存
+                self.active_lyrics_messages[ctx.guild.id] = lyrics_messages
 
             except Exception as e:
-                print(f"[VOICE ERROR] 歌詞スレッドの作成に失敗: {e}")
+                print(f"[VOICE ERROR] 歌詞の読み込みに失敗: {e}")
                 await ctx.send(f"⚠️ 歌詞の読み込みに失敗しました: {e}")
         else:
-            await ctx.send(f"🎵 **{command_name}** を再生中... (歌詞ファイルなし)")
+            now_playing_msg = await ctx.send(f"🎵 **{command_name}** を再生中... (歌詞ファイルなし)")
+            lyrics_messages.append(now_playing_msg)
+            self.active_lyrics_messages[ctx.guild.id] = lyrics_messages
 
-    async def _cleanup_lyrics_thread(self, ctx):
-        """再生終了後に呼ばれるクリーンアップ処理"""
+    async def _cleanup_lyrics_messages(self, ctx):
+        """再生終了後に呼ばれるクリーンアップ処理（歌詞メッセージ削除）"""
         print(f"[VOICE] 再生終了クリーンアップを開始: {ctx.guild.name}")
-        if hasattr(self, 'active_lyrics_threads') and ctx.guild.id in self.active_lyrics_threads:
-            thread = self.active_lyrics_threads.pop(ctx.guild.id)
-            if thread:
+        if hasattr(self, 'active_lyrics_messages') and ctx.guild.id in self.active_lyrics_messages:
+            messages = self.active_lyrics_messages.pop(ctx.guild.id)
+            for msg in messages:
                 try:
-                    # スレッドをアーカイブ or 削除
-                    # print(f"[VOICE] 歌詞スレッドをロック/アーカイブします: {thread.name}")
-                    # await thread.edit(archived=True, locked=True) 
-                    
-                    # 要件は「自動削除」のようなものだったので、削除してしまう
-                    print(f"[VOICE] 歌詞スレッドを削除します: {thread.name}")
-                    await thread.delete()
-                    
-                    # 親メッセージも削除するかは要件次第だが、とりあえずスレッドだけで十分か
-                    # 親メッセージの削除も試みる
-                    try:
-                        channel = thread.parent
-                        if channel:
-                            parent_msg = await channel.fetch_message(thread.id) # スレッドID = 親メッセージID
-                            await parent_msg.delete()
-                    except:
-                        pass # 親メッセージが見つからない等は無視
-
+                    await msg.delete()
+                    print(f"[VOICE] 歌詞メッセージを削除しました: {msg.id}")
                 except Exception as e:
-                    print(f"[VOICE ERROR] スレッド削除中にエラー: {e}")
+                    print(f"[VOICE ERROR] メッセージ削除中にエラー: {e}")
 
     @commands.Cog.listener()
     async def on_message(self, message):
