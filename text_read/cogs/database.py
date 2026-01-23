@@ -6,7 +6,7 @@ def db_init():
     """データベースの初期化"""
     print("[DATABASE] データベース初期化を開始します")
     try:
-        with sqlite3.connect("messages.db") as conn:
+        with sqlite3.connect("/home/ubuntu/discord/text_read/messages.db") as conn:
             c = conn.cursor()
             c.execute("""
                 CREATE TABLE IF NOT EXISTS messages (
