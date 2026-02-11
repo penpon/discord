@@ -147,6 +147,13 @@ class VoiceCommands:
 
                 self.voice_channel = target_channel
                 self.last_active = time.time()
+                
+                # 参加後に「こんにちは」とつぶやく
+                if self.tts:
+                    await self.tts.generate_tts("こんにちは")
+                    voice_client = ctx.guild.voice_client
+                    if voice_client and not voice_client.is_playing():
+                        await self.tts.play_audio(voice_client)
             except Exception as e:
                 print(f"[VOICE ERROR] 参加/移動処理中にエラーが発生しました: {str(e)}")
             finally:
