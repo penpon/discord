@@ -6,33 +6,11 @@ from discord.ext import commands
 from discord import FFmpegPCMAudio
 
 from core.config import URL_PATTERN, LONG_NUMBER_PATTERN, SOUNDS_DIR, ADMIN_USER_ID
-from core.database import (
-    db_init,
-    save_message,
-    set_user_profile,
-    get_user_profile,
-    delete_user_profile,
-    list_user_profiles,
-)
+from core.database import db_init, save_message
 from core.tts_handler import TTSHandler
 from cogs.voice_commands import VoiceCommands
 
 logger = logging.getLogger(__name__)
-
-# TTSプロファイル定義（0=デフォルト、1〜3=ユーザー1〜3）
-TTS_PROFILES = {
-    0: None,  # デフォルト（フィルタなし）
-    1: "equalizer=f=800:t=q:w=1.0:g=0,equalizer=f=4000:t=q:w=1.0:g=3,acompressor=threshold=-18dB:ratio=2:attack=5:release=50,alimiter=limit=0.9,atempo=1.3",
-    2: "asetrate=48000*1.059,aresample=48000,atempo=0.60,equalizer=f=3000:t=q:w=1.0:g=3",
-    3: "asetrate=48000*0.943,aresample=48000,atempo=1.060,equalizer=f=200:t=q:w=1.0:g=2,equalizer=f=3000:t=q:w=1.0:g=-2",
-}
-
-PROFILE_NAMES = {
-    0: "デフォルト",
-    1: "ユーザー1（明瞭・ニュース調）",
-    2: "ユーザー2（明るめ・速め）",
-    3: "ユーザー3（低め・標準速度）",
-}
 
 # ファイル再生コマンドのマッピング
 ALLOWED_FILES = {
@@ -55,11 +33,9 @@ class TTSandDB(commands.Cog):
         logger.info("[MAIN] Cogの初期化が完了しました")
 
     def _is_admin(self, ctx) -> bool:
-        """管理者ユーザーかチェック"""
         return str(ctx.author.id) == ADMIN_USER_ID
 
     async def _deny_non_admin(self, ctx) -> bool:
-        """管理者以外のユーザーをブロックし、Trueを返す（通過の場合はFalse）"""
         if not self._is_admin(ctx):
             logger.warning(
                 f"[COMMAND] 権限のないユーザーがコマンドを実行: {ctx.author.name} (ID: {ctx.author.id})"
@@ -125,85 +101,6 @@ class TTSandDB(commands.Cog):
         except Exception as e:
             await ctx.send(f"メッセージの削除中にエラーが発生しました: {e}")
             logger.error(f"[COMMAND ERROR] メッセージ削除中にエラー: {e}")
-
-    @commands.command(name="tts_profile_set")
-    async def tts_profile_set(self, ctx, user: commands.MemberConverter, profile: int):
-        """ユーザーにTTSプロファイルを割り当て（特定ユーザー限定）"""
-        if await self._deny_non_admin(ctx):
-            return
-
-        logger.info(
-            f"[COMMAND] tts_profile_set: {ctx.author.name} -> {user.name} = {profile}"
-        )
-
-        if profile not in TTS_PROFILES:
-            await ctx.send(
-                f"❌ プロファイル番号は0〜{max(TTS_PROFILES.keys())}の範囲で指定してください。"
-            )
-            return
-
-        set_user_profile(str(user.id), profile)
-        await ctx.send(
-            f"✅ {user.mention} のTTSプロファイルを **{PROFILE_NAMES[profile]}** に設定しました。"
-        )
-
-    @commands.command(name="tts_profile_clear")
-    async def tts_profile_clear(self, ctx, user: commands.MemberConverter):
-        """ユーザーのTTSプロファイル割当を削除（特定ユーザー限定）"""
-        if await self._deny_non_admin(ctx):
-            return
-
-        logger.info(f"[COMMAND] tts_profile_clear: {ctx.author.name} -> {user.name}")
-        delete_user_profile(str(user.id))
-        await ctx.send(
-            f"✅ {user.mention} のTTSプロファイル割当を削除しました（デフォルトに戻ります）。"
-        )
-
-    @commands.command(name="tts_profile_show")
-    async def tts_profile_show(self, ctx, user: commands.MemberConverter = None):
-        """ユーザーの現在のTTSプロファイルを表示"""
-        target_user = user or ctx.author
-        logger.info(
-            f"[COMMAND] tts_profile_show: {ctx.author.name} -> {target_user.name}"
-        )
-
-        profile = get_user_profile(str(target_user.id)) or 0
-        if profile not in TTS_PROFILES:
-            profile = 0
-
-        await ctx.send(
-            f"🔊 {target_user.mention} のTTSプロファイル: **{PROFILE_NAMES[profile]}** (ID: {profile})"
-        )
-
-    @commands.command(name="tts_profile_list")
-    async def tts_profile_list(self, ctx):
-        """全ユーザーのTTSプロファイル割当一覧を表示（特定ユーザー限定）"""
-        if await self._deny_non_admin(ctx):
-            return
-
-        logger.info(f"[COMMAND] tts_profile_list: {ctx.author.name}")
-        profiles = list_user_profiles()
-
-        if not profiles:
-            await ctx.send(
-                "📋 現在、プロファイルが割り当てられているユーザーはいません。"
-            )
-            return
-
-        lines = ["📋 **TTSプロファイル割当一覧**"]
-        for user_id, profile_id in profiles:
-            try:
-                user = await self.bot.fetch_user(int(user_id))
-                user_name = user.name
-            except Exception:
-                user_name = f"Unknown (ID: {user_id})"
-
-            display_id = profile_id if profile_id in TTS_PROFILES else 0
-            lines.append(
-                f"・{user_name}: {PROFILE_NAMES[display_id]} (ID: {display_id})"
-            )
-
-        await ctx.send("\n".join(lines))
 
     @commands.command(name="play")
     async def play(self, ctx, command_name: str):
@@ -301,17 +198,8 @@ class TTSandDB(commands.Cog):
         if self.voice.voice_channel and message.guild.voice_client:
             voice_client = message.guild.voice_client
             if message.channel == voice_client.channel:
-                user_id = str(message.author.id)
-                profile_id = get_user_profile(user_id) or 0
-                if profile_id not in TTS_PROFILES:
-                    profile_id = 0
-
-                ffmpeg_filter = TTS_PROFILES.get(profile_id)
-                playback_speed = 1.75 if profile_id == 1 else 1.0
-                logger.info(f"[TTS] {message.author.name}: profile={profile_id}")
-                await self.tts.generate_tts(
-                    message.content, speed=playback_speed, ffmpeg_filter=ffmpeg_filter
-                )
+                logger.info(f"[TTS] {message.author.name}: 読み上げ")
+                await self.tts.generate_tts(message.content)
                 if not voice_client.is_playing():
                     await self.tts.play_audio(voice_client)
 
