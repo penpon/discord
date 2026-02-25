@@ -1,6 +1,6 @@
 # Discord Bot
 
-このDiscord Botは音声読み上げ機能とポケモン関連機能を提供します。
+このDiscord Botは音声読み上げ機能を提供します。
 
 ## 機能一覧
 
@@ -32,9 +32,6 @@
 #### その他のコマンド
 - `$clear_bot [数]` - BOTのメッセージを指定数削除（特定ユーザー限定）
 
-#### ポケモン機能
-- ポケモン関連のクイズ機能
-- ポケモン画像の管理
 
 ### 現在無効化されている機能
 
@@ -49,10 +46,6 @@
 
 ```
 discord/
-├── general/              # 汎用スクリプト
-├── pokemon/             # ポケモン関連機能
-│   ├── cogs/           # ポケモンBot用Cogs
-│   └── pokemon_jpg/    # ポケモン画像
 ├── text_read/          # TTS機能
 │   ├── cogs/          # TTS Bot用Cogs
 │   │   ├── hayato_api.py    # (無効化) RAG機能
@@ -79,6 +72,4 @@ pip install -r requirements.txt
 # TTS Bot
 python text_read/main.py
 
-# ポケモンBot
-python pokemon/main.py
 ```
