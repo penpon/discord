@@ -1,8 +1,11 @@
-# main_cog.py
-from discord.ext import commands
-from discord import VoiceClient, FFmpegPCMAudio
+import logging
 import os
-from core.config import URL_PATTERN, LONG_NUMBER_PATTERN, SOUNDS_DIR
+import asyncio
+
+from discord.ext import commands
+from discord import FFmpegPCMAudio
+
+from core.config import URL_PATTERN, LONG_NUMBER_PATTERN, SOUNDS_DIR, ADMIN_USER_ID
 from core.database import (
     db_init,
     save_message,
@@ -13,147 +16,144 @@ from core.database import (
 )
 from core.tts_handler import TTSHandler
 from cogs.voice_commands import VoiceCommands
-import asyncio
 
+logger = logging.getLogger(__name__)
 
 # TTSプロファイル定義（0=デフォルト、1〜3=ユーザー1〜3）
 TTS_PROFILES = {
     0: None,  # デフォルト（フィルタなし）
-    1: "equalizer=f=800:t=q:w=1.0:g=0,equalizer=f=4000:t=q:w=1.0:g=3,acompressor=threshold=-18dB:ratio=2:attack=5:release=50,alimiter=limit=0.9,atempo=1.3",  # 明瞭・ニュース調・やや速め
-    2: "asetrate=48000*1.059,aresample=48000,atempo=0.60,equalizer=f=3000:t=q:w=1.0:g=3",  # 明るめ・ゆっくり
-    3: "asetrate=48000*0.943,aresample=48000,atempo=1.060,equalizer=f=200:t=q:w=1.0:g=2,equalizer=f=3000:t=q:w=1.0:g=-2",  # 低め・標準速度
+    1: "equalizer=f=800:t=q:w=1.0:g=0,equalizer=f=4000:t=q:w=1.0:g=3,acompressor=threshold=-18dB:ratio=2:attack=5:release=50,alimiter=limit=0.9,atempo=1.3",
+    2: "asetrate=48000*1.059,aresample=48000,atempo=0.60,equalizer=f=3000:t=q:w=1.0:g=3",
+    3: "asetrate=48000*0.943,aresample=48000,atempo=1.060,equalizer=f=200:t=q:w=1.0:g=2,equalizer=f=3000:t=q:w=1.0:g=-2",
+}
+
+PROFILE_NAMES = {
+    0: "デフォルト",
+    1: "ユーザー1（明瞭・ニュース調）",
+    2: "ユーザー2（明るめ・速め）",
+    3: "ユーザー3（低め・標準速度）",
+}
+
+# ファイル再生コマンドのマッピング
+ALLOWED_FILES = {
+    "pipeline": "pipeline.mp3",
+    "ぬ": "ぬの歌.mp3",
+    "はやね": "はやねの歌.mp3",
+    "なつき": "なつきの歌.mp3",
+    "めむむ": "めむむの歌.mp3",
 }
 
 
 class TTSandDB(commands.Cog):
     def __init__(self, bot):
-        print("[MAIN] Cogの初期化を開始します")
+        logger.info("[MAIN] Cogの初期化を開始します")
         self.bot = bot
         self.tts = TTSHandler()
         self.voice = VoiceCommands(bot, tts_handler=self.tts)
-        self.special_user_id = "514786727634927647"  # 特別なユーザーID
+        self.active_lyrics_messages: dict = {}
         db_init()
-        print("[MAIN] Cogの初期化が完了しました")
+        logger.info("[MAIN] Cogの初期化が完了しました")
+
+    def _is_admin(self, ctx) -> bool:
+        """管理者ユーザーかチェック"""
+        return str(ctx.author.id) == ADMIN_USER_ID
+
+    async def _deny_non_admin(self, ctx) -> bool:
+        """管理者以外のユーザーをブロックし、Trueを返す（通過の場合はFalse）"""
+        if not self._is_admin(ctx):
+            logger.warning(
+                f"[COMMAND] 権限のないユーザーがコマンドを実行: {ctx.author.name} (ID: {ctx.author.id})"
+            )
+            await ctx.send("このコマンドは特定のユーザーのみが実行できます。")
+            return True
+        return False
 
     @commands.command(name="join")
     async def join(self, ctx):
         """ボイスチャンネルに参加するコマンド"""
-        print(f"[COMMAND] joinコマンドが実行されました: {ctx.author.name}")
+        logger.info(f"[COMMAND] join: {ctx.author.name}")
         await self.voice.join(ctx)
 
     @commands.command(name="leave")
     async def leave(self, ctx):
         """ボイスチャンネルから退出するコマンド"""
-        print(f"[COMMAND] leaveコマンドが実行されました: {ctx.author.name}")
+        logger.info(f"[COMMAND] leave: {ctx.author.name}")
         await self.voice.leave(ctx)
 
     @commands.command(name="clear_bot")
     async def clear_bot(self, ctx, amount: int = 10):
         """BOTのメッセージを指定した数だけ削除するコマンド"""
-        # 指定されたユーザーIDのみコマンド実行を許可
-        if str(ctx.author.id) != self.special_user_id:
-            print(
-                f"[COMMAND] 権限がないユーザーがコマンドを実行しようとしました: {ctx.author.name} (ID: {ctx.author.id})"
-            )
-            await ctx.send("このコマンドは特定のユーザーのみが実行できます。")
+        if await self._deny_non_admin(ctx):
             return
 
-        # ユーザーコマンドメッセージの削除は行わない
-        print(f"[COMMAND] clear_botコマンドを実行: {ctx.author.name}")
+        logger.info(f"[COMMAND] clear_bot: {ctx.author.name}, amount={amount}")
 
-        # amountの値を限定
         if amount <= 0:
             await ctx.send(
                 "削除するメッセージ数は1以上を指定してください。", delete_after=5
             )
             return
         if amount > 100:
-            amount = 100  # 一度に削除するメッセージ数を制限
+            amount = 100
 
         try:
-            # purgeの代わりに手動でBotのメッセージを取得して削除
             deleted_count = 0
-            async for message in ctx.channel.history(limit=200):  # 多めに取得
+            async for message in ctx.channel.history(limit=200):
                 if deleted_count >= amount:
                     break
-
-                # 自分自身のメッセージのみを削除
                 if message.author.id == self.bot.user.id:
                     try:
                         await message.delete()
                         deleted_count += 1
-                        # 削除したらちょっと待機（レート制限防止）
                         await asyncio.sleep(0.5)
                     except Exception as e:
-                        print(f"[COMMAND WARNING] メッセージ削除中にエラー: {e}")
+                        logger.warning(f"[COMMAND] メッセージ削除中にエラー: {e}")
 
-            # 結果を表示
             result_msg = await ctx.send(
                 f"{deleted_count}個のBOTメッセージを削除しました。"
             )
-            # 5秒後に通知メッセージも削除するよう試みる
             try:
                 await asyncio.sleep(5)
                 await result_msg.delete()
             except Exception as e:
-                print(f"[COMMAND WARNING] 結果メッセージの削除に失敗しました: {e}")
+                logger.warning(f"[COMMAND] 結果メッセージの削除に失敗: {e}")
 
-            print(
+            logger.info(
                 f"[COMMAND] {ctx.author.name}が{deleted_count}個のBOTメッセージを削除しました"
             )
 
         except Exception as e:
             await ctx.send(f"メッセージの削除中にエラーが発生しました: {e}")
-            print(f"[COMMAND ERROR] メッセージ削除中にエラー: {e}")
+            logger.error(f"[COMMAND ERROR] メッセージ削除中にエラー: {e}")
 
     @commands.command(name="tts_profile_set")
     async def tts_profile_set(self, ctx, user: commands.MemberConverter, profile: int):
         """ユーザーにTTSプロファイルを割り当て（特定ユーザー限定）"""
-        # 特定ユーザーIDのみコマンド実行を許可
-        if str(ctx.author.id) != self.special_user_id:
-            print(
-                f"[COMMAND] 権限がないユーザーがコマンドを実行しようとしました: {ctx.author.name} (ID: {ctx.author.id})"
-            )
-            await ctx.send("このコマンドは特定のユーザーのみが実行できます。")
+        if await self._deny_non_admin(ctx):
             return
 
-        print(
-            f"[COMMAND] tts_profile_setコマンドを実行: {ctx.author.name} -> {user.name} = {profile}"
+        logger.info(
+            f"[COMMAND] tts_profile_set: {ctx.author.name} -> {user.name} = {profile}"
         )
 
-        # プロファイル番号の検証
         if profile not in TTS_PROFILES:
-            await ctx.send(f"❌ プロファイル番号は0〜3の範囲で指定してください。")
+            await ctx.send(
+                f"❌ プロファイル番号は0〜{max(TTS_PROFILES.keys())}の範囲で指定してください。"
+            )
             return
 
-        # DBに保存
         set_user_profile(str(user.id), profile)
-
-        profile_names = [
-            "デフォルト",
-            "ユーザー1（明瞭・ニュース調）",
-            "ユーザー2（明るめ・速め）",
-            "ユーザー3（低め・標準速度）",
-        ]
         await ctx.send(
-            f"✅ {user.mention} のTTSプロファイルを **{profile_names[profile]}** に設定しました。"
+            f"✅ {user.mention} のTTSプロファイルを **{PROFILE_NAMES[profile]}** に設定しました。"
         )
 
     @commands.command(name="tts_profile_clear")
     async def tts_profile_clear(self, ctx, user: commands.MemberConverter):
         """ユーザーのTTSプロファイル割当を削除（特定ユーザー限定）"""
-        # 特定ユーザーIDのみコマンド実行を許可
-        if str(ctx.author.id) != self.special_user_id:
-            print(
-                f"[COMMAND] 権限がないユーザーがコマンドを実行しようとしました: {ctx.author.name} (ID: {ctx.author.id})"
-            )
-            await ctx.send("このコマンドは特定のユーザーのみが実行できます。")
+        if await self._deny_non_admin(ctx):
             return
 
-        print(
-            f"[COMMAND] tts_profile_clearコマンドを実行: {ctx.author.name} -> {user.name}"
-        )
-
+        logger.info(f"[COMMAND] tts_profile_clear: {ctx.author.name} -> {user.name}")
         delete_user_profile(str(user.id))
         await ctx.send(
             f"✅ {user.mention} のTTSプロファイル割当を削除しました（デフォルトに戻ります）。"
@@ -163,39 +163,25 @@ class TTSandDB(commands.Cog):
     async def tts_profile_show(self, ctx, user: commands.MemberConverter = None):
         """ユーザーの現在のTTSプロファイルを表示"""
         target_user = user or ctx.author
-        print(
-            f"[COMMAND] tts_profile_showコマンドを実行: {ctx.author.name} -> {target_user.name}"
+        logger.info(
+            f"[COMMAND] tts_profile_show: {ctx.author.name} -> {target_user.name}"
         )
 
-        profile = get_user_profile(str(target_user.id))
-        if profile is None:
-            profile = 0  # 未登録はデフォルト扱い
+        profile = get_user_profile(str(target_user.id)) or 0
         if profile not in TTS_PROFILES:
             profile = 0
 
-        profile_names = [
-            "デフォルト",
-            "ユーザー1（明瞭・ニュース調）",
-            "ユーザー2（明るめ・やや高め）",
-            "ユーザー3（低め・落ち着き）",
-        ]
         await ctx.send(
-            f"🔊 {target_user.mention} のTTSプロファイル: **{profile_names[profile]}** (ID: {profile})"
+            f"🔊 {target_user.mention} のTTSプロファイル: **{PROFILE_NAMES[profile]}** (ID: {profile})"
         )
 
     @commands.command(name="tts_profile_list")
     async def tts_profile_list(self, ctx):
         """全ユーザーのTTSプロファイル割当一覧を表示（特定ユーザー限定）"""
-        # 特定ユーザーIDのみコマンド実行を許可
-        if str(ctx.author.id) != self.special_user_id:
-            print(
-                f"[COMMAND] 権限がないユーザーがコマンドを実行しようとしました: {ctx.author.name} (ID: {ctx.author.id})"
-            )
-            await ctx.send("このコマンドは特定のユーザーのみが実行できます。")
+        if await self._deny_non_admin(ctx):
             return
 
-        print(f"[COMMAND] tts_profile_listコマンドを実行: {ctx.author.name}")
-
+        logger.info(f"[COMMAND] tts_profile_list: {ctx.author.name}")
         profiles = list_user_profiles()
 
         if not profiles:
@@ -204,20 +190,17 @@ class TTSandDB(commands.Cog):
             )
             return
 
-        profile_names = ["デフォルト", "ユーザー1", "ユーザー2", "ユーザー3"]
-
-        # ユーザー名を取得して表示
         lines = ["📋 **TTSプロファイル割当一覧**"]
         for user_id, profile_id in profiles:
             try:
                 user = await self.bot.fetch_user(int(user_id))
                 user_name = user.name
-            except:
+            except Exception:
                 user_name = f"Unknown (ID: {user_id})"
 
             display_id = profile_id if profile_id in TTS_PROFILES else 0
             lines.append(
-                f"・{user_name}: {profile_names[display_id]} (ID: {display_id})"
+                f"・{user_name}: {PROFILE_NAMES[display_id]} (ID: {display_id})"
             )
 
         await ctx.send("\n".join(lines))
@@ -225,78 +208,49 @@ class TTSandDB(commands.Cog):
     @commands.command(name="play")
     async def play(self, ctx, command_name: str):
         """指定されたコマンドに対応する音声ファイルを再生するコマンド"""
-        # 許可されたコマンドとファイルのマッピング
-        # ALLOWED_FILES = {"とにかくやれ": "とにかくやれ.mp3", "ぬの歌": "ぬの歌.mp3", "はやねの歌": "はやねの歌.mp3", "なつきの歌": "なつきの歌.mp3", "めむむの歌": "めむむの歌.mp3"}
-        ALLOWED_FILES = {
-            "pipeline": "pipeline.mp3",
-            "ぬ": "ぬの歌.mp3",
-            "はやね": "はやねの歌.mp3",
-            "なつき": "なつきの歌.mp3",
-            "めむむ": "めむむの歌.mp3",
-        }
-
-        # ユーザーがボイスチャンネルに参加しているか確認
         if not ctx.author.voice:
             await ctx.send("ボイスチャンネルに参加してください。")
             return
 
-        # ボイスチャンネルに参加（未接続の場合）
         if not ctx.voice_client:
             await self.join(ctx)
 
         voice_client = ctx.voice_client
-
-        # コマンドに対応するファイル名を取得
         filename = ALLOWED_FILES.get(command_name)
         if not filename:
-            # await ctx.send(f"コマンド '{command_name}' に対応する音声ファイルが見つかりません。")
             return
 
-        # 音声ファイルのパス（カレントディレクトリからの相対パス）
         audio_path = os.path.join(SOUNDS_DIR, filename)
-
-        # ファイルの存在確認
         if not os.path.exists(audio_path):
-            # await ctx.send(f"ファイル {filename} が見つかりません。")
+            logger.warning(f"[PLAY] ファイルが見つかりません: {audio_path}")
             return
 
-        # 音声ファイルを再生
         audio_source = FFmpegPCMAudio(audio_path)
 
         def after_playing(error):
             if error:
-                print(f"[VOICE ERROR] 再生エラー: {error}")
-
-            # 再生終了後のクリーンアップ処理（歌詞メッセージ削除）
+                logger.error(f"[VOICE ERROR] 再生エラー: {error}")
             coro = self._cleanup_lyrics_messages(ctx)
             fut = asyncio.run_coroutine_threadsafe(coro, self.bot.loop)
             try:
                 fut.result()
             except Exception as e:
-                print(f"[VOICE ERROR] クリーンアップタスクのスケジュールに失敗: {e}")
+                logger.error(
+                    f"[VOICE ERROR] クリーンアップタスクのスケジュールに失敗: {e}"
+                )
 
         voice_client.play(audio_source, after=after_playing)
 
-        # 歌詞ファイルの確認とメッセージ送信
         txt_filename = filename.rsplit(".", 1)[0] + ".txt"
         txt_path = os.path.join(SOUNDS_DIR, txt_filename)
-
-        # クリーンアップ用にメッセージ情報を保存する辞書を初期化
-        if not hasattr(self, "active_lyrics_messages"):
-            self.active_lyrics_messages = {}
-
         lyrics_messages = []
 
         if os.path.exists(txt_path):
             try:
                 with open(txt_path, "r", encoding="utf-8") as f:
                     lyrics_content = f.read()
-
-                # 再生中メッセージを送信
                 now_playing_msg = await ctx.send(f"🎵 **{command_name}** を再生中...")
                 lyrics_messages.append(now_playing_msg)
-
-                # 歌詞を投稿 (2000文字制限を考慮して分割投稿)
                 if len(lyrics_content) > 1900:
                     for i in range(0, len(lyrics_content), 1900):
                         msg = await ctx.send(lyrics_content[i : i + 1900])
@@ -304,12 +258,9 @@ class TTSandDB(commands.Cog):
                 else:
                     msg = await ctx.send(lyrics_content)
                     lyrics_messages.append(msg)
-
-                # クリーンアップ用にメッセージ情報を保存
                 self.active_lyrics_messages[ctx.guild.id] = lyrics_messages
-
             except Exception as e:
-                print(f"[VOICE ERROR] 歌詞の読み込みに失敗: {e}")
+                logger.error(f"[VOICE ERROR] 歌詞の読み込みに失敗: {e}")
                 await ctx.send(f"⚠️ 歌詞の読み込みに失敗しました: {e}")
         else:
             now_playing_msg = await ctx.send(
@@ -320,66 +271,44 @@ class TTSandDB(commands.Cog):
 
     async def _cleanup_lyrics_messages(self, ctx):
         """再生終了後に呼ばれるクリーンアップ処理（歌詞メッセージ削除）"""
-        print(f"[VOICE] 再生終了クリーンアップを開始: {ctx.guild.name}")
-        if (
-            hasattr(self, "active_lyrics_messages")
-            and ctx.guild.id in self.active_lyrics_messages
-        ):
+        logger.info(f"[VOICE] 再生終了クリーンアップ: {ctx.guild.name}")
+        if ctx.guild.id in self.active_lyrics_messages:
             messages = self.active_lyrics_messages.pop(ctx.guild.id)
             for msg in messages:
                 try:
                     await msg.delete()
-                    print(f"[VOICE] 歌詞メッセージを削除しました: {msg.id}")
                 except Exception as e:
-                    print(f"[VOICE ERROR] メッセージ削除中にエラー: {e}")
+                    logger.warning(f"[VOICE] メッセージ削除中にエラー: {e}")
 
     @commands.Cog.listener()
     async def on_message(self, message):
-        print(
-            f"[MESSAGE] 新しいメッセージを受信: {message.author.name} - {message.content}..."
+        logger.debug(
+            f"[MESSAGE] 受信: {message.author.name} - {message.content[:30]}..."
         )
-        # BOT自身のメッセージは処理しない
         if message.author == self.bot.user:
-            print(f"[MESSAGE] BOT自身のメッセージをスキップ: {message.content[:30]}...")
             return
-
         if message.content.startswith("$"):
-            print(f"[MESSAGE] コマンドメッセージをスキップ: {message.content}")
             return
-
-        # 不適切なメッセージのフィルタリング
         if URL_PATTERN.search(message.content):
-            print("[FILTER] URLを含むメッセージをスキップしました")
+            logger.debug("[FILTER] URLを含むメッセージをスキップ")
             return
         if LONG_NUMBER_PATTERN.search(message.content):
-            print("[FILTER] 長い数字を含むメッセージをスキップしました")
+            logger.debug("[FILTER] 長い数字を含むメッセージをスキップ")
             return
 
-        # メッセージ保存
         save_message(str(message.author), message.content, str(message.created_at))
 
-        # TTS処理
         if self.voice.voice_channel and message.guild.voice_client:
             voice_client = message.guild.voice_client
             if message.channel == voice_client.channel:
-                print("[TTS] ボイスチャット用メッセージを処理します")
-
-                # ユーザーのTTSプロファイルを取得
                 user_id = str(message.author.id)
-                profile_id = get_user_profile(user_id)
-                if profile_id is None:
-                    profile_id = 0  # 未登録はデフォルト
+                profile_id = get_user_profile(user_id) or 0
                 if profile_id not in TTS_PROFILES:
                     profile_id = 0
 
-                # プロファイルからフィルタを取得
                 ffmpeg_filter = TTS_PROFILES.get(profile_id)
-                print(
-                    f"[TTS] ユーザー {message.author.name} のプロファイル: {profile_id}, フィルタ: {ffmpeg_filter}"
-                )
-
-                # TTS生成とキュー追加（プロファイルフィルタを適用）
                 playback_speed = 1.75 if profile_id == 1 else 1.0
+                logger.info(f"[TTS] {message.author.name}: profile={profile_id}")
                 await self.tts.generate_tts(
                     message.content, speed=playback_speed, ffmpeg_filter=ffmpeg_filter
                 )
@@ -390,11 +319,6 @@ class TTSandDB(commands.Cog):
     async def on_voice_state_update(self, member, before, after):
         if member.bot:
             return
-
-        print(
-            f"[VOICE STATE] ボイス状態の変更を検出: {member.name} ({before.channel} -> {after.channel})"
-        )
-
         if before.channel == after.channel:
             return
 
@@ -405,7 +329,6 @@ class TTSandDB(commands.Cog):
         )
         if not voice_client:
             return
-        # 未接続状態ではTTS生成・再生を行わない
         if (
             not getattr(voice_client, "is_connected", None)
             or not voice_client.is_connected()
@@ -431,13 +354,13 @@ class TTSandDB(commands.Cog):
                     1.3,
                 )
 
-        print(f"[VOICE NOTICE] 通知メッセージを生成: {text}")
+        logger.info(f"[VOICE NOTICE] {text}")
         await self.tts.generate_tts(text, speed)
         if not voice_client.is_playing():
             await self.tts.play_audio(voice_client)
 
 
 async def setup(bot):
-    print("[MAIN] Cogをセットアップします")
+    logger.info("[MAIN] Cogをセットアップします")
     await bot.add_cog(TTSandDB(bot))
-    print("[MAIN] Cogのセットアップが完了しました")
+    logger.info("[MAIN] Cogのセットアップが完了しました")
