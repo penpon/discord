@@ -31,20 +31,23 @@ client = commands.Bot(command_prefix="$", intents=intents)
 
 
 @client.event
+async def setup_hook():
+    """Cog読み込み（起動時に一度だけ実行）"""
+    await main_cog.setup(client)
+    await general.setup(client)
+    logger.info("全てのCogを読み込みました")
+
+
+@client.event
 async def on_ready():
     logger.info("-----")
     logger.info(client.user.name)
     logger.info(client.user.id)
     logger.info(discord.__version__)
     logger.info("-----")
-    try:
-        await main_cog.setup(client)
-        await general.setup(client)
-        await client.change_presence(
-            activity=discord.CustomActivity(name="👾読み上げBot稼働中👾")
-        )
-    except discord.errors.ClientException as e:
-        logger.error(e)
+    await client.change_presence(
+        activity=discord.CustomActivity(name="👾読み上げBot稼働中👾")
+    )
 
 
 @client.event

@@ -8,9 +8,11 @@ ENV PYTHONUNBUFFERED=1
 # 作業ディレクトリの設定
 WORKDIR /app
 
-# 必要なシステムパッケージ (ffmpegなど) をインストール
+# 必要なシステムパッケージ (ffmpeg, libsodium等) をインストール
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends ffmpeg git build-essential && \
+    apt-get install -y --no-install-recommends \
+    ffmpeg git build-essential \
+    libsodium-dev libffi-dev && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 

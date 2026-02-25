@@ -22,7 +22,9 @@ ALLOWED_FILES = {
 }
 
 
-class TTSandDB(commands.Cog):
+class TTSandDB(commands.Cog, name="読み上げBot"):
+    """テキスト読み上げ・音声再生・メッセージ管理"""
+
     def __init__(self, bot):
         logger.info("[MAIN] Cogの初期化を開始します")
         self.bot = bot
@@ -46,19 +48,19 @@ class TTSandDB(commands.Cog):
 
     @commands.command(name="join")
     async def join(self, ctx):
-        """ボイスチャンネルに参加するコマンド"""
+        """ボイスチャンネルに参加します"""
         logger.info(f"[COMMAND] join: {ctx.author.name}")
         await self.voice.join(ctx)
 
     @commands.command(name="leave")
     async def leave(self, ctx):
-        """ボイスチャンネルから退出するコマンド"""
+        """ボイスチャンネルから退出します"""
         logger.info(f"[COMMAND] leave: {ctx.author.name}")
         await self.voice.leave(ctx)
 
     @commands.command(name="clear_bot")
     async def clear_bot(self, ctx, amount: int = 10):
-        """BOTのメッセージを指定した数だけ削除するコマンド"""
+        """BOTのメッセージを削除します（管理者限定、デフォルト10件）"""
         if await self._deny_non_admin(ctx):
             return
 
@@ -104,7 +106,7 @@ class TTSandDB(commands.Cog):
 
     @commands.command(name="play")
     async def play(self, ctx, command_name: str):
-        """指定されたコマンドに対応する音声ファイルを再生するコマンド"""
+        """音声ファイルを再生します（pipeline / ぬ / はやね / なつき / めむむ）"""
         if not ctx.author.voice:
             await ctx.send("ボイスチャンネルに参加してください。")
             return
