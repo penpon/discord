@@ -10,10 +10,10 @@ if _bot_dir not in sys.path:
 if _project_root not in sys.path:
     sys.path.insert(0, _project_root)
 
-import discord
-from discord.ext import commands
-from cogs import main_cog
-from cogs import general
+import discord  # noqa: E402
+from discord.ext import commands  # noqa: E402
+from cogs import main_cog  # noqa: E402
+from cogs import general  # noqa: E402
 
 logging.basicConfig(
     level=logging.INFO,
