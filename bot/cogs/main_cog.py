@@ -2,8 +2,8 @@
 from discord.ext import commands
 from discord import VoiceClient, FFmpegPCMAudio
 import os
-from cogs.config import URL_PATTERN, LONG_NUMBER_PATTERN
-from cogs.database import (
+from core.config import URL_PATTERN, LONG_NUMBER_PATTERN, SOUNDS_DIR
+from core.database import (
     db_init,
     save_message,
     set_user_profile,
@@ -11,11 +11,7 @@ from cogs.database import (
     delete_user_profile,
     list_user_profiles,
 )
-
-# from cogs.hayato_api import ask_hayato
-from cogs.tts_handler import TTSHandler
-
-# from cogs.elevenlabs_tts import ElevenLabsTTS  # ElevenLabs は一時停止中のため無効化
+from core.tts_handler import TTSHandler
 from cogs.voice_commands import VoiceCommands
 import asyncio
 
@@ -34,22 +30,8 @@ class TTSandDB(commands.Cog):
         print("[MAIN] Cogの初期化を開始します")
         self.bot = bot
         self.tts = TTSHandler()
-        self.voice = VoiceCommands(bot, tts_handler=self.tts)  # ElevenLabs を渡さない
-        # self.elevenlabs_tts = ElevenLabsTTS()  # ElevenLabs は一時停止
+        self.voice = VoiceCommands(bot, tts_handler=self.tts)
         self.special_user_id = "514786727634927647"  # 特別なユーザーID
-        # 各機能のオン/オフフラグ
-        # self.hayato_tts_enabled = True  # 音声生成機能
-        # self.hayato_reply_enabled = False  # リプライ応答機能 - 基本無効
-        # 環境変数のデバッグ出力
-        # print(f"[VOICE_ID DEBUG] ELEVENLABS_VOICE_ID_milk: {os.environ.get('ELEVENLABS_VOICE_ID_milk')}")
-        # print(f"[VOICE_ID DEBUG] ELEVENLABS_VOICE_ID_hayane: {os.environ.get('ELEVENLABS_VOICE_ID_hayane')}")
-
-        # self.custom_voice_users = {
-        #     # milk用のボイスID
-        #     "514786727634927647": os.environ.get("ELEVENLABS_VOICE_ID_milk"),
-        #     # hayane用のボイスID
-        #     "1223636376038412338": os.environ.get("ELEVENLABS_VOICE_ID_hayane"),
-        # }
         db_init()
         print("[MAIN] Cogの初期化が完了しました")
 
@@ -65,25 +47,9 @@ class TTSandDB(commands.Cog):
         print(f"[COMMAND] leaveコマンドが実行されました: {ctx.author.name}")
         await self.voice.leave(ctx)
 
-    # @commands.command(name="toggle_hayato_reply")
-    # async def toggle_hayato_reply(self, ctx):
-    #     """hayatoのリプライ応答機能をオン/オフするコマンド"""
-    #     # 指定されたユーザーIDのみコマンド実行を許可
-    #     if str(ctx.author.id) != self.special_user_id:
-    #         print(
-    #             f"[COMMAND] 権限がないユーザーがコマンドを実行しようとしました: {ctx.author.name} (ID: {ctx.author.id})"
-    #         )
-    #         await ctx.send("このコマンドは特定のユーザーのみが実行できます。")
-    #         return
-
-    #     self.hayato_reply_enabled = not self.hayato_reply_enabled
-    #     status = "有効" if self.hayato_reply_enabled else "無効"
-    #     print(f"[COMMAND] hayatoのリプライ応答機能を{status}に切り替えました: {ctx.author.name}")
-    #     # await ctx.send(f"hayato reply {status}")
-
     @commands.command(name="clear_bot")
     async def clear_bot(self, ctx, amount: int = 10):
-        """BOTのメッセージを指定した数だけ削除するコマンド """
+        """BOTのメッセージを指定した数だけ削除するコマンド"""
         # 指定されたユーザーIDのみコマンド実行を許可
         if str(ctx.author.id) != self.special_user_id:
             print(
@@ -97,7 +63,9 @@ class TTSandDB(commands.Cog):
 
         # amountの値を限定
         if amount <= 0:
-            await ctx.send("削除するメッセージ数は1以上を指定してください。", delete_after=5)
+            await ctx.send(
+                "削除するメッセージ数は1以上を指定してください。", delete_after=5
+            )
             return
         if amount > 100:
             amount = 100  # 一度に削除するメッセージ数を制限
@@ -120,7 +88,9 @@ class TTSandDB(commands.Cog):
                         print(f"[COMMAND WARNING] メッセージ削除中にエラー: {e}")
 
             # 結果を表示
-            result_msg = await ctx.send(f"{deleted_count}個のBOTメッセージを削除しました。")
+            result_msg = await ctx.send(
+                f"{deleted_count}個のBOTメッセージを削除しました。"
+            )
             # 5秒後に通知メッセージも削除するよう試みる
             try:
                 await asyncio.sleep(5)
@@ -128,7 +98,9 @@ class TTSandDB(commands.Cog):
             except Exception as e:
                 print(f"[COMMAND WARNING] 結果メッセージの削除に失敗しました: {e}")
 
-            print(f"[COMMAND] {ctx.author.name}が{deleted_count}個のBOTメッセージを削除しました")
+            print(
+                f"[COMMAND] {ctx.author.name}が{deleted_count}個のBOTメッセージを削除しました"
+            )
 
         except Exception as e:
             await ctx.send(f"メッセージの削除中にエラーが発生しました: {e}")
@@ -139,71 +111,101 @@ class TTSandDB(commands.Cog):
         """ユーザーにTTSプロファイルを割り当て（特定ユーザー限定）"""
         # 特定ユーザーIDのみコマンド実行を許可
         if str(ctx.author.id) != self.special_user_id:
-            print(f"[COMMAND] 権限がないユーザーがコマンドを実行しようとしました: {ctx.author.name} (ID: {ctx.author.id})")
+            print(
+                f"[COMMAND] 権限がないユーザーがコマンドを実行しようとしました: {ctx.author.name} (ID: {ctx.author.id})"
+            )
             await ctx.send("このコマンドは特定のユーザーのみが実行できます。")
             return
-        
-        print(f"[COMMAND] tts_profile_setコマンドを実行: {ctx.author.name} -> {user.name} = {profile}")
-        
+
+        print(
+            f"[COMMAND] tts_profile_setコマンドを実行: {ctx.author.name} -> {user.name} = {profile}"
+        )
+
         # プロファイル番号の検証
         if profile not in TTS_PROFILES:
             await ctx.send(f"❌ プロファイル番号は0〜3の範囲で指定してください。")
             return
-        
+
         # DBに保存
         set_user_profile(str(user.id), profile)
-        
-        profile_names = ["デフォルト", "ユーザー1（明瞭・ニュース調）", "ユーザー2（明るめ・速め）", "ユーザー3（低め・標準速度）"]
-        await ctx.send(f"✅ {user.mention} のTTSプロファイルを **{profile_names[profile]}** に設定しました。")
-    
+
+        profile_names = [
+            "デフォルト",
+            "ユーザー1（明瞭・ニュース調）",
+            "ユーザー2（明るめ・速め）",
+            "ユーザー3（低め・標準速度）",
+        ]
+        await ctx.send(
+            f"✅ {user.mention} のTTSプロファイルを **{profile_names[profile]}** に設定しました。"
+        )
+
     @commands.command(name="tts_profile_clear")
     async def tts_profile_clear(self, ctx, user: commands.MemberConverter):
         """ユーザーのTTSプロファイル割当を削除（特定ユーザー限定）"""
         # 特定ユーザーIDのみコマンド実行を許可
         if str(ctx.author.id) != self.special_user_id:
-            print(f"[COMMAND] 権限がないユーザーがコマンドを実行しようとしました: {ctx.author.name} (ID: {ctx.author.id})")
+            print(
+                f"[COMMAND] 権限がないユーザーがコマンドを実行しようとしました: {ctx.author.name} (ID: {ctx.author.id})"
+            )
             await ctx.send("このコマンドは特定のユーザーのみが実行できます。")
             return
-        
-        print(f"[COMMAND] tts_profile_clearコマンドを実行: {ctx.author.name} -> {user.name}")
-        
+
+        print(
+            f"[COMMAND] tts_profile_clearコマンドを実行: {ctx.author.name} -> {user.name}"
+        )
+
         delete_user_profile(str(user.id))
-        await ctx.send(f"✅ {user.mention} のTTSプロファイル割当を削除しました（デフォルトに戻ります）。")
-    
+        await ctx.send(
+            f"✅ {user.mention} のTTSプロファイル割当を削除しました（デフォルトに戻ります）。"
+        )
+
     @commands.command(name="tts_profile_show")
     async def tts_profile_show(self, ctx, user: commands.MemberConverter = None):
         """ユーザーの現在のTTSプロファイルを表示"""
         target_user = user or ctx.author
-        print(f"[COMMAND] tts_profile_showコマンドを実行: {ctx.author.name} -> {target_user.name}")
-        
+        print(
+            f"[COMMAND] tts_profile_showコマンドを実行: {ctx.author.name} -> {target_user.name}"
+        )
+
         profile = get_user_profile(str(target_user.id))
         if profile is None:
             profile = 0  # 未登録はデフォルト扱い
         if profile not in TTS_PROFILES:
             profile = 0
-        
-        profile_names = ["デフォルト", "ユーザー1（明瞭・ニュース調）", "ユーザー2（明るめ・やや高め）", "ユーザー3（低め・落ち着き）"]
-        await ctx.send(f"🔊 {target_user.mention} のTTSプロファイル: **{profile_names[profile]}** (ID: {profile})")
-    
+
+        profile_names = [
+            "デフォルト",
+            "ユーザー1（明瞭・ニュース調）",
+            "ユーザー2（明るめ・やや高め）",
+            "ユーザー3（低め・落ち着き）",
+        ]
+        await ctx.send(
+            f"🔊 {target_user.mention} のTTSプロファイル: **{profile_names[profile]}** (ID: {profile})"
+        )
+
     @commands.command(name="tts_profile_list")
     async def tts_profile_list(self, ctx):
         """全ユーザーのTTSプロファイル割当一覧を表示（特定ユーザー限定）"""
         # 特定ユーザーIDのみコマンド実行を許可
         if str(ctx.author.id) != self.special_user_id:
-            print(f"[COMMAND] 権限がないユーザーがコマンドを実行しようとしました: {ctx.author.name} (ID: {ctx.author.id})")
+            print(
+                f"[COMMAND] 権限がないユーザーがコマンドを実行しようとしました: {ctx.author.name} (ID: {ctx.author.id})"
+            )
             await ctx.send("このコマンドは特定のユーザーのみが実行できます。")
             return
-        
+
         print(f"[COMMAND] tts_profile_listコマンドを実行: {ctx.author.name}")
-        
+
         profiles = list_user_profiles()
-        
+
         if not profiles:
-            await ctx.send("📋 現在、プロファイルが割り当てられているユーザーはいません。")
+            await ctx.send(
+                "📋 現在、プロファイルが割り当てられているユーザーはいません。"
+            )
             return
-        
+
         profile_names = ["デフォルト", "ユーザー1", "ユーザー2", "ユーザー3"]
-        
+
         # ユーザー名を取得して表示
         lines = ["📋 **TTSプロファイル割当一覧**"]
         for user_id, profile_id in profiles:
@@ -212,18 +214,26 @@ class TTSandDB(commands.Cog):
                 user_name = user.name
             except:
                 user_name = f"Unknown (ID: {user_id})"
-            
+
             display_id = profile_id if profile_id in TTS_PROFILES else 0
-            lines.append(f"・{user_name}: {profile_names[display_id]} (ID: {display_id})")
-        
+            lines.append(
+                f"・{user_name}: {profile_names[display_id]} (ID: {display_id})"
+            )
+
         await ctx.send("\n".join(lines))
 
     @commands.command(name="play")
     async def play(self, ctx, command_name: str):
         """指定されたコマンドに対応する音声ファイルを再生するコマンド"""
         # 許可されたコマンドとファイルのマッピング
-         # ALLOWED_FILES = {"とにかくやれ": "とにかくやれ.mp3", "ぬの歌": "ぬの歌.mp3", "はやねの歌": "はやねの歌.mp3", "なつきの歌": "なつきの歌.mp3", "めむむの歌": "めむむの歌.mp3"}
-        ALLOWED_FILES = {"pipeline": "pipeline.mp3", "ぬ": "ぬの歌.mp3", "はやね": "はやねの歌.mp3", "なつき": "なつきの歌.mp3", "めむむ": "めむむの歌.mp3"}
+        # ALLOWED_FILES = {"とにかくやれ": "とにかくやれ.mp3", "ぬの歌": "ぬの歌.mp3", "はやねの歌": "はやねの歌.mp3", "なつきの歌": "なつきの歌.mp3", "めむむの歌": "めむむの歌.mp3"}
+        ALLOWED_FILES = {
+            "pipeline": "pipeline.mp3",
+            "ぬ": "ぬの歌.mp3",
+            "はやね": "はやねの歌.mp3",
+            "なつき": "なつきの歌.mp3",
+            "めむむ": "めむむの歌.mp3",
+        }
 
         # ユーザーがボイスチャンネルに参加しているか確認
         if not ctx.author.voice:
@@ -243,7 +253,7 @@ class TTSandDB(commands.Cog):
             return
 
         # 音声ファイルのパス（カレントディレクトリからの相対パス）
-        audio_path = os.path.join("sounds", filename)
+        audio_path = os.path.join(SOUNDS_DIR, filename)
 
         # ファイルの存在確認
         if not os.path.exists(audio_path):
@@ -256,7 +266,7 @@ class TTSandDB(commands.Cog):
         def after_playing(error):
             if error:
                 print(f"[VOICE ERROR] 再生エラー: {error}")
-            
+
             # 再生終了後のクリーンアップ処理（歌詞メッセージ削除）
             coro = self._cleanup_lyrics_messages(ctx)
             fut = asyncio.run_coroutine_threadsafe(coro, self.bot.loop)
@@ -266,35 +276,35 @@ class TTSandDB(commands.Cog):
                 print(f"[VOICE ERROR] クリーンアップタスクのスケジュールに失敗: {e}")
 
         voice_client.play(audio_source, after=after_playing)
-        
+
         # 歌詞ファイルの確認とメッセージ送信
-        txt_filename = filename.rsplit('.', 1)[0] + '.txt'
-        txt_path = os.path.join("sounds", txt_filename)
-        
+        txt_filename = filename.rsplit(".", 1)[0] + ".txt"
+        txt_path = os.path.join(SOUNDS_DIR, txt_filename)
+
         # クリーンアップ用にメッセージ情報を保存する辞書を初期化
-        if not hasattr(self, 'active_lyrics_messages'):
+        if not hasattr(self, "active_lyrics_messages"):
             self.active_lyrics_messages = {}
-        
+
         lyrics_messages = []
-        
+
         if os.path.exists(txt_path):
             try:
-                with open(txt_path, 'r', encoding='utf-8') as f:
+                with open(txt_path, "r", encoding="utf-8") as f:
                     lyrics_content = f.read()
-                
+
                 # 再生中メッセージを送信
                 now_playing_msg = await ctx.send(f"🎵 **{command_name}** を再生中...")
                 lyrics_messages.append(now_playing_msg)
-                
+
                 # 歌詞を投稿 (2000文字制限を考慮して分割投稿)
                 if len(lyrics_content) > 1900:
                     for i in range(0, len(lyrics_content), 1900):
-                        msg = await ctx.send(lyrics_content[i:i+1900])
+                        msg = await ctx.send(lyrics_content[i : i + 1900])
                         lyrics_messages.append(msg)
                 else:
                     msg = await ctx.send(lyrics_content)
                     lyrics_messages.append(msg)
-                
+
                 # クリーンアップ用にメッセージ情報を保存
                 self.active_lyrics_messages[ctx.guild.id] = lyrics_messages
 
@@ -302,14 +312,19 @@ class TTSandDB(commands.Cog):
                 print(f"[VOICE ERROR] 歌詞の読み込みに失敗: {e}")
                 await ctx.send(f"⚠️ 歌詞の読み込みに失敗しました: {e}")
         else:
-            now_playing_msg = await ctx.send(f"🎵 **{command_name}** を再生中... (歌詞ファイルなし)")
+            now_playing_msg = await ctx.send(
+                f"🎵 **{command_name}** を再生中... (歌詞ファイルなし)"
+            )
             lyrics_messages.append(now_playing_msg)
             self.active_lyrics_messages[ctx.guild.id] = lyrics_messages
 
     async def _cleanup_lyrics_messages(self, ctx):
         """再生終了後に呼ばれるクリーンアップ処理（歌詞メッセージ削除）"""
         print(f"[VOICE] 再生終了クリーンアップを開始: {ctx.guild.name}")
-        if hasattr(self, 'active_lyrics_messages') and ctx.guild.id in self.active_lyrics_messages:
+        if (
+            hasattr(self, "active_lyrics_messages")
+            and ctx.guild.id in self.active_lyrics_messages
+        ):
             messages = self.active_lyrics_messages.pop(ctx.guild.id)
             for msg in messages:
                 try:
@@ -320,7 +335,9 @@ class TTSandDB(commands.Cog):
 
     @commands.Cog.listener()
     async def on_message(self, message):
-        print(f"[MESSAGE] 新しいメッセージを受信: {message.author.name} - {message.content}...")
+        print(
+            f"[MESSAGE] 新しいメッセージを受信: {message.author.name} - {message.content}..."
+        )
         # BOT自身のメッセージは処理しない
         if message.author == self.bot.user:
             print(f"[MESSAGE] BOT自身のメッセージをスキップ: {message.content[:30]}...")
@@ -329,102 +346,6 @@ class TTSandDB(commands.Cog):
         if message.content.startswith("$"):
             print(f"[MESSAGE] コマンドメッセージをスキップ: {message.content}")
             return
-
-        # # メンション処理
-        # if self.bot.user in message.mentions:
-        #     print(f"[MENTION] メンションを検出: {message.content[:50]}...")
-        #     print(
-        #         f"[MENTION DEBUG] hayato_reply_enabledフラグの状態: {self.hayato_reply_enabled}"
-        #     )
-
-        #     # リプライ応答機能が有効な場合のみ処理
-        #     if self.hayato_reply_enabled:
-        #         question = message.content.replace(f"<@{self.bot.user.id}>", "").strip()
-        #         if question:
-        #             print(f"[HAYATO] hayatoに質問を送信します: {question[:30]}...")
-        #             try:
-        #                 response = ask_hayato(question)
-        #                 await message.channel.send(response)
-
-        #                 # hayatoの応答をTTSで再生する処理 - すべてのユーザーが対象
-        #                 if (
-        #                     self.hayato_tts_enabled
-        #                     and self.voice.voice_channel
-        #                     and message.guild.voice_client
-        #                 ):
-        #                     print(
-        #                         f"[HAYATO TTS DEBUG] TTSが有効化されています: {self.hayato_tts_enabled}"
-        #                     )
-        #                     print(
-        #                         f"[HAYATO TTS DEBUG] ボイスチャンネル: {self.voice.voice_channel}"
-        #                     )
-        #                     print(
-        #                         f"[HAYATO TTS DEBUG] ギルドボイスクライアント: {message.guild.voice_client}"
-        #                     )
-        #                     voice_client = message.guild.voice_client
-        #                     # milkの音声IDを使用
-        #                     # milk_voice_id = os.environ.get("ELEVENLABS_VOICE_ID_milk")
-        #                     # if milk_voice_id:
-        #                     #     print(
-        #                     #         f"[HAYATO TTS] hayatoの応答を音声で再生します: {response[:30]}..."
-        #                     #     )
-        #                     #     # 現在の再生を停止してから新しい音声を生成する
-        #                     #     if voice_client.is_playing():
-        #                     #         voice_client.stop()
-
-        #                     #     print(f"[HAYATO TTS DEBUG] 音声生成の前にデバッグ")
-        #                     #     print(
-        #                     #         f"[HAYATO TTS DEBUG] milk_voice_id: {milk_voice_id}"
-        #                     #     )
-        #                     #     print(
-        #                     #         f"[HAYATO TTS DEBUG] response: {response[:30]}..."
-        #                     #     )
-
-        #                     #     # 音声生成（自動キュー追加は無効化）
-        #                     #     try:
-        #                     #         print(
-        #                     #             f"[HAYATO TTS DEBUG] elevenlabs_tts.generate_ttsを呼び出します"
-        #                     #         )
-        #                     #         file_path = await self.elevenlabs_tts.generate_tts(
-        #                     #             response, milk_voice_id, auto_queue=False
-        #                     #         )
-        #                     #         print(
-        #                     #             f"[HAYATO TTS DEBUG] 生成結果のfile_path: {file_path}"
-        #                     #         )
-        #                     #     except Exception as e:
-        #                     #         print(f"[HAYATO TTS ERROR] 音声生成中に例外が発生しました: {e}")
-        #                     #     if file_path:
-        #                     #         # キューに登録して再生
-        #                     #         print(f"[HAYATO TTS] 音声ファイルをキューに追加します: {file_path}")
-        #                     #         await self.elevenlabs_tts.audio_queue.put(file_path)
-        #                     #         print(
-        #                     #             f"[HAYATO TTS] キュー追加完了（現在のサイズ: {self.elevenlabs_tts.audio_queue.qsize()}）"
-        #                     #         )
-        #                     #         # 再生中でなければ再生を開始
-        #                     #         if not voice_client.is_playing():
-        #                     #             print(f"[HAYATO TTS] 再生を開始します")
-        #                     #             await self.elevenlabs_tts.play_audio(
-        #                     #                 voice_client
-        #                     #             )
-        #                     #     else:
-        #                     #         print("[HAYATO TTS ERROR] 音声ファイルの生成に失敗しました")
-        #                     # else:
-        #                     #     print(
-        #                     #         "[HAYATO TTS ERROR] ELEVENLABS_VOICE_ID_milkが設定されていません"
-        #                     #     )
-
-        #                     # 一旦通常のTTSを使用
-        #                     print(f"[HAYATO TTS] hayatoの応答を音声で再生します: {response[:30]}...")
-        #                     if voice_client.is_playing():
-        #                         voice_client.stop()
-        #                     await self.tts.generate_tts(response)
-        #                     if not voice_client.is_playing():
-        #                         await self.tts.play_audio(voice_client)
-        #             except Exception as e:
-        #                 print(f"[HAYATO ERROR] 応答生成時にエラーが発生しました: {e}")
-        #                 await message.channel.send("あれ？何かおかしいみたい。もう一度試してみて！")
-        #     else:
-        #         print(f"[HAYATO] リプライ応答機能が無効化されているため、応答しません")
 
         # 不適切なメッセージのフィルタリング
         if URL_PATTERN.search(message.content):
@@ -442,7 +363,7 @@ class TTSandDB(commands.Cog):
             voice_client = message.guild.voice_client
             if message.channel == voice_client.channel:
                 print("[TTS] ボイスチャット用メッセージを処理します")
-                
+
                 # ユーザーのTTSプロファイルを取得
                 user_id = str(message.author.id)
                 profile_id = get_user_profile(user_id)
@@ -450,14 +371,18 @@ class TTSandDB(commands.Cog):
                     profile_id = 0  # 未登録はデフォルト
                 if profile_id not in TTS_PROFILES:
                     profile_id = 0
-                
+
                 # プロファイルからフィルタを取得
                 ffmpeg_filter = TTS_PROFILES.get(profile_id)
-                print(f"[TTS] ユーザー {message.author.name} のプロファイル: {profile_id}, フィルタ: {ffmpeg_filter}")
-                
+                print(
+                    f"[TTS] ユーザー {message.author.name} のプロファイル: {profile_id}, フィルタ: {ffmpeg_filter}"
+                )
+
                 # TTS生成とキュー追加（プロファイルフィルタを適用）
                 playback_speed = 1.75 if profile_id == 1 else 1.0
-                await self.tts.generate_tts(message.content, speed=playback_speed, ffmpeg_filter=ffmpeg_filter)
+                await self.tts.generate_tts(
+                    message.content, speed=playback_speed, ffmpeg_filter=ffmpeg_filter
+                )
                 if not voice_client.is_playing():
                     await self.tts.play_audio(voice_client)
 

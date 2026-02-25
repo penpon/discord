@@ -1,0 +1,14 @@
+version: '3.8'
+
+services:
+  bot:
+    build: .
+    container_name: discord_tts_bot
+    restart: always
+    env_file:
+      - .env
+    volumes:
+      - ./data:/app/data
+      # 開発中やアセットのホットリロードが必要な場合は以下を有効化
+      # - ./assets:/app/assets
+      # - ./bot:/app/bot

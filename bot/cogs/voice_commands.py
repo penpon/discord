@@ -7,12 +7,11 @@ import time
 
 
 class VoiceCommands:
-    def __init__(self, bot, tts_handler=None, elevenlabs_tts=None):
+    def __init__(self, bot, tts_handler=None):
         print("[VOICE] ボイスコマンドを初期化します")
         self.bot = bot
         # TTSハンドラー参照（切断時にキューをクリアするため）
         self.tts = tts_handler
-        self.elevenlabs_tts = elevenlabs_tts
         self.voice_channel = None
         # 接続制御と自動退出の安定化用フラグ
         self._connect_lock = asyncio.Lock()
@@ -53,7 +52,9 @@ class VoiceCommands:
             print("[VOICE] 最後のメンバーになったため退出します")
             await self._cleanup_voice(voice_client)
 
-    async def _cleanup_voice(self, voice_client: VoiceClient, preserve_queue: bool = False):
+    async def _cleanup_voice(
+        self, voice_client: VoiceClient, preserve_queue: bool = False
+    ):
         """音声接続のクリーンアップ"""
         try:
             print("[VOICE] 音声接続をクリーンアップします")
@@ -67,8 +68,6 @@ class VoiceCommands:
                 try:
                     if self.tts:
                         self.tts.clear_queue()
-                    if self.elevenlabs_tts:
-                        self.elevenlabs_tts.clear_queue()
                     print("[VOICE] TTSキューをクリアしました")
                 except Exception as e:
                     print(f"[VOICE WARNING] TTSキュークリア中にエラー: {e}")
@@ -103,17 +102,28 @@ class VoiceCommands:
                         stabilized = False
                         while time.time() < deadline:
                             vc = ctx.guild.voice_client
-                            if vc and getattr(vc, "is_connected", None) and vc.is_connected() and vc.channel == target_channel:
+                            if (
+                                vc
+                                and getattr(vc, "is_connected", None)
+                                and vc.is_connected()
+                                and vc.channel == target_channel
+                            ):
                                 stabilized = True
                                 break
                             await asyncio.sleep(0.2)
                         if not stabilized:
-                            print("[VOICE WARN] move_to後に安定接続を確認できませんでした。フォールバックを実施します")
+                            print(
+                                "[VOICE WARN] move_to後に安定接続を確認できませんでした。フォールバックを実施します"
+                            )
                             try:
                                 # フォールバック：キュー保持でクリーンアップ→クールダウン→新規接続
-                                await self._cleanup_voice(voice_client, preserve_queue=True)
+                                await self._cleanup_voice(
+                                    voice_client, preserve_queue=True
+                                )
                             except Exception as e:
-                                print(f"[VOICE WARNING] フォールバック前クリーンアップ中に例外: {e}")
+                                print(
+                                    f"[VOICE WARNING] フォールバック前クリーンアップ中に例外: {e}"
+                                )
                             await asyncio.sleep(0.5)  # フォールバック前クールダウン
                             print("[VOICE] フォールバック接続を開始します")
                             await target_channel.connect()
@@ -122,14 +132,21 @@ class VoiceCommands:
                             stabilized = False
                             while time.time() < deadline:
                                 vc = ctx.guild.voice_client
-                                if vc and getattr(vc, "is_connected", None) and vc.is_connected() and vc.channel == target_channel:
+                                if (
+                                    vc
+                                    and getattr(vc, "is_connected", None)
+                                    and vc.is_connected()
+                                    and vc.channel == target_channel
+                                ):
                                     stabilized = True
                                     break
                                 await asyncio.sleep(0.2)
                             if stabilized:
                                 print("[VOICE] フォールバック接続が安定しました")
                             else:
-                                print("[VOICE ERROR] フォールバック後も安定接続を確認できませんでした")
+                                print(
+                                    "[VOICE ERROR] フォールバック後も安定接続を確認できませんでした"
+                                )
                         else:
                             print("[VOICE] 移動が完了し、接続が安定しました")
                     else:
@@ -141,13 +158,18 @@ class VoiceCommands:
                     deadline = time.time() + 2.0
                     while time.time() < deadline:
                         vc = ctx.guild.voice_client
-                        if vc and getattr(vc, "is_connected", None) and vc.is_connected() and vc.channel == target_channel:
+                        if (
+                            vc
+                            and getattr(vc, "is_connected", None)
+                            and vc.is_connected()
+                            and vc.channel == target_channel
+                        ):
                             break
                         await asyncio.sleep(0.2)
 
                 self.voice_channel = target_channel
                 self.last_active = time.time()
-                
+
                 # 参加後に「こんにちは」とつぶやく
                 if self.tts:
                     await self.tts.generate_tts("こんにちは")

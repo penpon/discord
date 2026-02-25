@@ -1,8 +1,16 @@
-# config.py
 import os
 import re
 
 print("[CONFIG] 設定ファイルを読み込み中...")
+
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+DATA_DIR = os.path.join(BASE_DIR, "data")
+ASSETS_DIR = os.path.join(BASE_DIR, "assets")
+
+os.makedirs(DATA_DIR, exist_ok=True)
+
+DB_PATH = os.path.join(DATA_DIR, "messages.db")
+SOUNDS_DIR = os.path.join(ASSETS_DIR, "sounds")
 
 DEEPSEEK_API_KEY = os.environ.get("DEEPSEEK_API_KEY")
 DEEPSEEK_API_URL = "https://api.deepseek.com/v1/chat/completions"
